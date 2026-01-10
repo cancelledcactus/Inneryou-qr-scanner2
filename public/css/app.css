@@ -1,0 +1,38 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0d1117;color:#e6edf3}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+.card{background:#161b22;border-radius:14px;padding:16px;box-shadow:0 0 20px rgba(0,0,0,.5)}
+h1{margin:0 0 10px 0;font-size:20px}
+h2{margin:14px 0 8px 0;font-size:16px}
+h3{margin:14px 0 8px 0;font-size:14px}
+.muted{color:#9aa7b2}
+.small{font-size:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+input,select,button{border:none;border-radius:10px;padding:10px 12px;background:#21262d;color:#e6edf3}
+button{cursor:pointer;font-weight:600}
+button.ghost{background:#0f1720;border:1px solid rgba(255,255,255,.06)}
+button.danger{background:#7f1d1d}
+.pill{padding:6px 10px;border-radius:999px;background:#21262d;border:1px solid rgba(255,255,255,.06);font-size:12px}
+.loginBox{display:flex;gap:8px;flex-wrap:wrap}
+.hidden{display:none !important}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tabBtn{background:#0f1720;border:1px solid rgba(255,255,255,.06)}
+.tabBtn.active{background:#21262d}
+.tabPane{margin-top:14px}
+.videoBox{margin-top:10px;border-radius:12px;overflow:hidden;aspect-ratio:1/1;background:#000;display:flex;align-items:center;justify-content:center}
+.toast{margin-top:10px;padding:10px;border-radius:10px;background:#21262d;opacity:0;transition:opacity .2s}
+.toast.ok{background:#166534}
+.toast.warn{background:#a16207}
+.toast.err{background:#7f1d1d}
+.list{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.listItem{padding:10px;border-radius:12px;background:#0f1720;border:1px solid rgba(255,255,255,.06)}
+.grid{margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.roomBox{padding:12px;border-radius:14px;background:#0f1720;border:1px solid rgba(255,255,255,.06);cursor:pointer}
+.roomBox.help{border-color:#f59e0b}
+.roomTitle{font-weight:800}
+.roomStats{display:flex;gap:10px;margin-top:6px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:999}
+.modalCard{max-width:520px;width:100%;background:#161b22;border-radius:14px;padding:14px}
+.scanOverlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:1000}
+.scanOverlayCard{max-width:520px;width:100%;background:#161b22;border-radius:14px;padding:14px}
