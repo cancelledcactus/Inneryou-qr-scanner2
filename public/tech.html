@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tech</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Tech Dashboard</h1>
+
+      <div id="loginBox" class="loginBox">
+        <input id="idInput" inputmode="numeric" placeholder="Enter 9-digit ID">
+        <button id="loginBtn">Login</button>
+        <button id="scanLoginBtn" class="ghost">Scan ID</button>
+      </div>
+
+      <div id="main" class="hidden">
+        <div class="row">
+          <div class="pill" id="periodPill">Period: …</div>
+          <button id="openScannerBtn">Open Scanner Mode</button>
+          <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+
+        <div id="grid" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- room detail modal -->
+  <div id="roomModal" class="modal hidden">
+    <div class="modalCard">
+      <h2 id="rmTitle">Room</h2>
+      <div id="rmBody" class="muted"></div>
+      <div class="row">
+        <button id="rmClose" class="ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/techCore.js"></script>
+</body>
+</html>
