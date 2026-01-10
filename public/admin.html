@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Admin Dashboard</h1>
+
+      <!-- Login -->
+      <div id="loginBox" class="loginBox">
+        <input id="idInput" inputmode="numeric" placeholder="Enter 9-digit Admin ID">
+        <button id="loginBtn">Login</button>
+        <button id="scanLoginBtn" class="ghost">Scan ID</button>
+      </div>
+
+      <!-- Main -->
+      <div id="main" class="hidden">
+        <div class="row">
+          <div class="pill" id="whoPill">—</div>
+          <button id="openScannerBtn">Open Scanner Mode</button>
+          <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tabBtn active" data-tab="live">Live Rooms</button>
+          <button class="tabBtn" data-tab="rooms">Rooms</button>
+          <button class="tabBtn" data-tab="periods">Periods</button>
+          <button class="tabBtn" data-tab="users">Users</button>
+          <button class="tabBtn" data-tab="settings">Settings</button>
+          <button class="tabBtn" data-tab="export">Export</button>
+          <button class="tabBtn danger" data-tab="testing">Testing</button>
+        </div>
+
+        <!-- Live -->
+        <section class="tabPane" id="tab-live">
+          <div class="row">
+            <div class="pill" id="periodPill">Period: …</div>
+            <div class="muted small" id="dayPill">—</div>
+          </div>
+          <div id="grid" class="grid"></div>
+        </section>
+
+        <!-- Rooms -->
+        <section class="tabPane hidden" id="tab-rooms">
+          <h2>Rooms</h2>
+          <div class="muted small">Rooms are flexible. No hardcoding.</div>
+
+          <div class="row">
+            <input id="roomName" placeholder="Room 101">
+            <button id="addRoomBtn">Add</button>
+          </div>
+
+          <h3>Quick Generate</h3>
+          <div class="row">
+            <input id="roomPrefix" placeholder="Prefix (e.g. Room )" value="Room ">
+            <input id="roomStart" inputmode="numeric" placeholder="Start (e.g. 101)" value="101">
+            <input id="roomEnd" inputmode="numeric" placeholder="End (e.g. 115)" value="115">
+            <button id="genRoomsBtn">Generate</button>
+          </div>
+
+          <div id="roomsList" class="list"></div>
+        </section>
+
+        <!-- Periods -->
+        <section class="tabPane hidden" id="tab-periods">
+          <h2>Periods</h2>
+          <div class="muted small">Periods are used for duplicate rules and reporting.</div>
+
+          <div class="row">
+            <input id="periodId" placeholder="P1">
+            <input id="periodName" placeholder="Period 1">
+            <input id="periodStart" placeholder="Start HH:MM (09:00)">
+            <input id="periodEnd" placeholder="End HH:MM (09:45)">
+            <button id="addPeriodBtn">Add</button>
+          </div>
+
+          <h3>Quick Generate 45-min Periods</h3>
+          <div class="row">
+            <input id="pPrefix" placeholder="ID prefix (P)" value="P">
+            <input id="pNamePrefix" placeholder="Name prefix (Period )" value="Period ">
+            <input id="pStartTime" placeholder="First start (09:00)" value="09:00">
+            <input id="pCount" inputmode="numeric" placeholder="Count (e.g. 6)" value="6">
+          </div>
+          <div class="row">
+            <input id="pDuration" inputmode="numeric" placeholder="Duration minutes" value="45">
+            <input id="pGap" inputmode="numeric" placeholder="Gap minutes (0-10)" value="0">
+            <button id="genPeriodsBtn">Generate</button>
+          </div>
+
+          <div id="periodsList" class="list"></div>
+        </section>
+
+        <!-- Users -->
+        <section class="tabPane hidden" id="tab-users">
+          <h2>Users</h2>
+          <div class="muted small">Add Tech/Admin IDs here. They can login by typing or scanning.</div>
+
+          <div class="row">
+            <input id="userId" inputmode="numeric" placeholder="9-digit ID">
+            <select id="userRole">
+              <option value="TECH">TECH</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+            <input id="userName" placeholder="Name (optional)">
+            <button id="addUserBtn">Add/Update</button>
+          </div>
+
+          <div id="usersList" class="list"></div>
+        </section>
+
+        <!-- Settings -->
+        <section class="tabPane hidden" id="tab-settings">
+          <h2>Settings</h2>
+
+          <div class="row">
+            <label class="muted small">Idle logout</label>
+            <select id="idleSelect">
+              <option value="0">Off</option>
+              <option value="120000">2 min</option>
+              <option value="300000" selected>5 min</option>
+              <option value="600000">10 min</option>
+              <option value="1800000">30 min</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label class="muted small">Testing allow NO_PERIOD</label>
+            <select id="noPeriodSelect">
+              <option value="true">True (testing)</option>
+              <option value="false">False (event mode)</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label class="muted small">Batch size</label>
+            <input id="batchSize" inputmode="numeric" value="5">
+          </div>
+
+          <div class="row">
+            <label class="muted small">Flush interval ms</label>
+            <input id="flushMs" inputmode="numeric" value="12000">
+          </div>
+
+          <div class="row">
+            <button id="saveSettingsBtn">Save Settings</button>
+          </div>
+
+          <div class="muted small" id="settingsMsg"></div>
+        </section>
+
+        <!-- Export -->
+        <section class="tabPane hidden" id="tab-export">
+          <h2>Export</h2>
+          <div class="muted small">Downloads CSV you can open in Google Sheets.</div>
+          <div class="row">
+            <button id="exportAllBtn">Export All Scans CSV</button>
+            <button id="exportSummaryBtn" class="ghost">Export Summary CSV</button>
+          </div>
+          <div class="muted small" id="exportMsg"></div>
+        </section>
+
+        <!-- Testing -->
+        <section class="tabPane hidden" id="tab-testing">
+          <h2>Testing Tools</h2>
+          <div class="muted small">Careful: Purge deletes all scans + summaries.</div>
+          <div class="row">
+            <button id="purgeBtn" class="danger">Purge Scans</button>
+          </div>
+          <div class="muted small" id="purgeMsg"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- room detail modal -->
+  <div id="roomModal" class="modal hidden">
+    <div class="modalCard">
+      <h2 id="rmTitle">Room</h2>
+      <div id="rmBody" class="muted"></div>
+      <div class="row">
+        <button id="rmClose" class="ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/adminCore.js"></script>
+</body>
+</html>
