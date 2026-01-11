@@ -1,39 +1,29 @@
 export async function onRequestPost({ request, env }) {
   try {
     const DB = env.DB;
-    if (!DB) {
-      return json({ ok:false, error:"DB not bound" }, 500);
-    }
+    if (!DB) return json({ ok:false, error:"DB_not_bound" }, 500);
 
     const body = await request.json().catch(() => null);
     if (!body || !body.room_id || !Array.isArray(body.items)) {
       return json({ ok:false, error:"bad_request" }, 400);
     }
 
-    const room_id = String(body.room_id);
-    const items = body.items.slice(0, 10); // hard safety cap
+    const room_id = String(body.room_id).trim();
+    const items = body.items.slice(0, 10);
 
-    // event day (NY time safe enough for events)
-    const now = new Date();
-    const event_day = now.toISOString().slice(0,10);
+    const event_day = new Date().toISOString().slice(0, 10);
+    const period_id = await getCurrentPeriodId(DB, "America/New_York");
 
-    // Resolve active period (or NO_PERIOD)
-    let period_id = "NO_PERIOD";
-    const period = await DB.prepare(`
-      SELECT period_id
-      FROM periods
-      WHERE active=1
-        AND time('now','localtime') BETWEEN start_time AND end_time
-      ORDER BY sort_order
-      LIMIT 1
-    `).first();
-
-    if (period?.period_id) period_id = period.period_id;
+    // ensure summary row exists
+    await DB.prepare(`
+      INSERT OR IGNORE INTO room_period_summary (event_day, period_id, room_id)
+      VALUES (?,?,?)
+    `).bind(event_day, period_id, room_id).run();
 
     const results = [];
 
     for (const it of items) {
-      const raw = String(it.qr_text || "").trim();
+      const raw = String(it.qr_text || "").replace(/\u00A0/g, " ").trim();
 
       // Parse "NAME , ID , GRADE"
       const parts = raw.split(",").map(s => s.trim());
@@ -49,6 +39,7 @@ export async function onRequestPost({ request, env }) {
 
       if (!/^\d{9}$/.test(student_id || "")) {
         results.push({ status:"error", student_id:null });
+        await bumpSummary(DB, event_day, period_id, room_id, "err", null);
         continue;
       }
 
@@ -59,36 +50,76 @@ export async function onRequestPost({ request, env }) {
           VALUES (?, ?, ?, ?, ?, ?, ?, 'SCANNER')
         `).bind(
           crypto.randomUUID(),
-          event_day,
-          period_id,
-          room_id,
-          student_id,
-          grade,
-          name
+          event_day, period_id, room_id,
+          student_id, grade, name
         ).run();
 
         results.push({ status:"ok", student_id });
+        await bumpSummary(DB, event_day, period_id, room_id, "ok", student_id);
 
       } catch (e) {
-        // Duplicate (unique index)
         if (String(e).includes("UNIQUE")) {
           results.push({ status:"duplicate", student_id });
+          await bumpSummary(DB, event_day, period_id, room_id, "dup", student_id);
         } else {
           results.push({ status:"error", student_id });
+          await bumpSummary(DB, event_day, period_id, room_id, "err", student_id);
         }
       }
     }
 
-    return json({
-      ok: true,
-      period_id,
-      results
-    });
+    return json({ ok:true, period_id, results });
 
   } catch (err) {
     console.error("scan_batch error", err);
     return json({ ok:false, error:"server_error" }, 500);
   }
+}
+
+async function bumpSummary(DB, event_day, period_id, room_id, kind, studentId) {
+  const ok = kind === "ok" ? 1 : 0;
+  const dup = kind === "dup" ? 1 : 0;
+  const err = kind === "err" ? 1 : 0;
+
+  await DB.prepare(`
+    UPDATE room_period_summary
+    SET ok_count = ok_count + ?,
+        dup_count = dup_count + ?,
+        err_count = err_count + ?,
+        last_ts = datetime('now'),
+        last_student_id = COALESCE(?, last_student_id),
+        last_heartbeat = datetime('now')
+    WHERE event_day=? AND period_id=? AND room_id=?
+  `).bind(ok, dup, err, studentId, event_day, period_id, room_id).run();
+}
+
+// timezone-safe "HH:MM" using Intl (Cloudflare runs in UTC otherwise)
+async function getCurrentPeriodId(DB, tz) {
+  const rows = await DB.prepare(`
+    SELECT period_id, start_time, end_time
+    FROM periods
+    WHERE active=1
+    ORDER BY sort_order ASC
+  `).all();
+
+  const cur = getTimeHHMM(tz); // "09:12"
+  for (const p of rows.results || []) {
+    if (p.start_time <= cur && cur < p.end_time) return p.period_id;
+  }
+  return "NO_PERIOD";
+}
+
+function getTimeHHMM(tz) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const parts = fmt.formatToParts(new Date());
+  const hh = parts.find(p => p.type === "hour")?.value ?? "00";
+  const mm = parts.find(p => p.type === "minute")?.value ?? "00";
+  return `${hh}:${mm}`;
 }
 
 function json(obj, status=200) {
