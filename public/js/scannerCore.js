@@ -22,8 +22,9 @@ const mSave = document.getElementById("mSave");
 const mCancel = document.getElementById("mCancel");
 
 let codeReader = null;
-let mediaStream = null;
 let scanning = false;
+let devices = [];
+let currentDeviceId = null;
 
 const STORAGE_KEY = "scanner_room_lock_v1";
 const QUEUE_KEY = "scanner_queue_v1";
@@ -202,43 +203,71 @@ stopBtn.addEventListener("click", () => stopCamera());
 
 async function startCamera() {
   if (scanning) return;
-  if (!navigator.mediaDevices?.getUserMedia) return showToast("Camera not supported", "err");
   if (!window.ZXing?.BrowserMultiFormatReader) return showToast("ZXing not loaded", "err");
 
-  videoBox.innerHTML = "";
-  const video = document.createElement("video");
-  video.setAttribute("playsinline", "");
-  video.muted = true;
-  video.autoplay = true;
-  video.style.width = "100%";
-  video.style.height = "100%";
-  videoBox.appendChild(video);
+  // build video element that ZXing will attach to
+  videoBox.innerHTML = `
+    <video id="scannerVideo" autoplay playsinline muted style="width:100%;height:100%"></video>
+  `;
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ ideal:"environment" } } });
-    video.srcObject = mediaStream;
-    await video.play();
+    if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
 
-    codeReader = codeReader || new ZXing.BrowserMultiFormatReader();
+    // reset any previous decoding loop
+    try { codeReader.reset(); } catch {}
+
+    // list cameras (this is what your old working code does)
+    devices = await codeReader.listVideoInputDevices();
+    if (!devices || devices.length === 0) {
+      showToast("No camera found", "err");
+      return;
+    }
+
+    // Choose back camera (best-effort)
+    const pickBack = (list) => {
+      // labels are often empty until permission is granted,
+      // but on many devices they contain "back"/"rear" after first allow.
+      const preferred = list.find(d => /back|rear|environment/i.test(d.label || ""));
+      return preferred?.deviceId || list[0].deviceId;
+    };
+
+    // If we already picked one before, keep it. Otherwise pick back.
+    if (!currentDeviceId) currentDeviceId = pickBack(devices);
+
     scanning = true;
     showToast("Scanning…", "info");
 
-    codeReader.decodeFromVideoElement(video, (result, err) => {
-      if (result) onScan(result.getText());
-    });
+    // IMPORTANT: old-style decode (most reliable for older iPads)
+    codeReader.decodeFromVideoDevice(
+      currentDeviceId,
+      "scannerVideo",
+      (result, err) => {
+        if (!scanning) return;
+
+        if (result) {
+          const text = (typeof result.getText === "function") ? result.getText() : (result.text || "");
+          onScan(String(text || "").trim());
+        } else {
+          // NotFoundException is normal; ignore
+          // Other errors can be logged if needed:
+          // if (err && !(err instanceof ZXing.NotFoundException)) console.log(err);
+        }
+      }
+    );
+
   } catch (e) {
+    console.error(e);
     scanning = false;
-    showToast("Camera blocked. Allow permission.", "err");
+    showToast("Camera failed. Check Safari camera permission.", "err");
   }
 }
 
 function stopCamera() {
   scanning = false;
   try { codeReader?.reset(); } catch {}
-  try { mediaStream?.getTracks()?.forEach(t=>t.stop()); } catch {}
-  mediaStream = null;
   showToast("Camera stopped", "info");
 }
+
 
 let lastScanText = "";
 let lastScanAt = 0;
