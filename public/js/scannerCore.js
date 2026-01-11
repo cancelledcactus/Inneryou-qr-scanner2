@@ -1,4 +1,4 @@
-import { api, getToken, requireLoginIfNeeded } from "./auth.js";
+import { api, getToken } from "./auth.js";
 
 const roomSelect = document.getElementById("roomSelect");
 const lockBtn = document.getElementById("lockBtn");
@@ -42,6 +42,9 @@ const BATCH_SIZE_DEFAULT = 5;
 let BATCH_SIZE = BATCH_SIZE_DEFAULT;
 let FLUSH_MS = 12000;
 
+// heartbeat timer
+let heartbeatTimer = null;
+
 function loadJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || "") ?? fallback; } catch { return fallback; }
 }
@@ -71,20 +74,30 @@ function updatePills() {
   errPill.textContent = `Errors: ${errCount}`;
 }
 
+// NEW: pull batch/flush from /api/public_settings
 async function loadConfig() {
-  // Pull settings from server via /api/admin_settings?public=1 (we’ll add below) or keep defaults.
-  // To keep this minimal, we’ll just keep defaults for now.
-  // You can later fetch batchSize/flushInterval from settings.
+  const res = await fetch("/api/public_settings")
+    .then(r => r.json())
+    .catch(() => null);
+
+  if (!res?.ok) return;
+
+  const s = res.settings || {};
+  const bs = Number(s.batchSize || BATCH_SIZE_DEFAULT);
+  const fm = Number(s.flushIntervalMs || 12000);
+
+  // clamp values for safety
+  BATCH_SIZE = Math.max(1, Math.min(10, bs));
+  FLUSH_MS = Math.max(2000, Math.min(60000, fm));
 }
 
+// NEW: load rooms from /api/public_rooms (no login required)
 async function loadRooms() {
-  // For now, rooms come from summary endpoint (works for everyone)
-  // If you want scanners to see only rooms, we can add /api/public/rooms too.
-  // We'll use rooms_summary even if not logged in (if you want locked down, we can change).
-  const res = await fetch("/api/rooms_summary", { headers: authHeadersMaybe() }).then(r=>r.json()).catch(()=>null);
+  const res = await fetch("/api/public_rooms")
+    .then(r => r.json())
+    .catch(() => null);
 
-  // If not logged in and endpoint blocks, we fallback to local list; admin can pre-load rooms.
-  const rooms = res?.rooms?.map(r => r.room_id) || [];
+  const rooms = res?.rooms || [];
 
   roomSelect.innerHTML = "";
   const opt0 = new Option("Select Room…", "");
@@ -92,11 +105,6 @@ async function loadRooms() {
   roomSelect.add(opt0);
 
   for (const r of rooms) roomSelect.add(new Option(r, r));
-}
-
-function authHeadersMaybe() {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
 function getLockState() {
@@ -117,11 +125,45 @@ function applyLockUi() {
   if (lockedRoom) roomSelect.value = lockedRoom;
 }
 
+// NEW: update period label + save to PERIOD_KEY
+function setPeriodLabel(p) {
+  const val = p || "…";
+  periodLabel.textContent = `Period: ${val}`;
+  saveJson(PERIOD_KEY, val);
+}
+
+// NEW: heartbeat ping
+async function sendHeartbeat() {
+  if (!isLocked || !lockedRoom) return;
+  try {
+    const res = await fetch("/api/heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ room_id: lockedRoom }),
+    }).then(r => r.json());
+
+    if (res?.ok && res.period_id) {
+      setPeriodLabel(res.period_id);
+    }
+  } catch (e) {
+    // silent (don’t spam UI)
+  }
+}
+
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(sendHeartbeat, 15000);
+  sendHeartbeat(); // immediate
+}
+
 lockBtn.addEventListener("click", async () => {
   if (!roomSelect.value) return showToast("Pick a room", "warn");
   setLockState(roomSelect.value, true);
   applyLockUi();
   showToast(`Locked: ${roomSelect.value}`, "ok");
+
+  // NEW: start heartbeat once locked
+  startHeartbeat();
 });
 
 manualBtn.addEventListener("click", () => {
@@ -205,28 +247,21 @@ function onScan(text) {
   const now = Date.now();
   const t = String(text || "").trim();
 
-  // simple debounce to reduce double reads
+  // debounce double reads
   if (t === lastScanText && (now - lastScanAt) < 900) return;
   lastScanText = t;
   lastScanAt = now;
 
-  // Queue the scan
   queue.push({ qr_text: t, manual: false, client_ts: now });
   saveJson(QUEUE_KEY, queue);
   updatePills();
 
-  // show queued quickly, server will confirm after flush
   showToast("Queued", "info");
-
   maybeFlush(false);
 }
 
 async function maybeFlush(force) {
   if (!isLocked) return;
-  if (!getToken()) {
-    // Scanner can be “open” (no login) if you want; if you want to lock scanners, add SCANNER role and require login here.
-    // For now, we allow scanning without login and set source_role via server token if present.
-  }
 
   if (force || queue.length >= BATCH_SIZE) {
     flushQueue();
@@ -257,24 +292,25 @@ async function flushQueue() {
       return;
     }
 
-    // remove sent items
+    // NEW: update period label from server response
+    if (res.period_id) setPeriodLabel(res.period_id);
+
+    // remove sent
     queue = queue.slice(batch.length);
     saveJson(QUEUE_KEY, queue);
 
-    // update local list with results
     for (const r of res.results || []) {
       if (r.status === "ok") sentCount++;
-      if (r.status === "duplicate") { /* count as sent too */ }
       if (r.status === "error") errCount++;
 
       localPeriodList.push({ student_id: r.student_id || "UNKNOWN", status: r.status });
       if (localPeriodList.length > 120) localPeriodList.shift();
     }
+
     saveJson(LOCAL_LIST_KEY, localPeriodList);
     renderLocalList();
     updatePills();
 
-    // show the last result
     const last = (res.results || []).slice(-1)[0];
     if (last?.status === "ok") showToast("Saved ✅", "ok");
     else if (last?.status === "duplicate") showToast("Duplicate ⚠️", "warn");
@@ -287,12 +323,6 @@ async function flushQueue() {
   } finally {
     flushing = false;
   }
-}
-
-// Period label: we’ll read it from scan responses or tech endpoint when logged in.
-// Simple: update from heartbeat response later. For now, show unknown.
-function setPeriodLabel(p) {
-  periodLabel.textContent = `Period: ${p}`;
 }
 
 function startFlushTimer() {
@@ -312,4 +342,7 @@ function startFlushTimer() {
   updatePills();
   setPeriodLabel(loadJson(PERIOD_KEY, "…"));
   startFlushTimer();
+
+  // NEW: if already locked from earlier, start heartbeat
+  if (isLocked && lockedRoom) startHeartbeat();
 })();
