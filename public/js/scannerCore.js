@@ -289,7 +289,48 @@ function onScan(text) {
   lastScanAt = now;
   scanCooldownUntil = now + SCAN_COOLDOWN_MS;
 
-  // (Admin/Tech badge handling will go here in section #3)
+    // If it looks like a 9-digit ID, check if it's an ADMIN/TECH badge
+  const possibleIdMatch = t.match(/\b(\d{9})\b/);
+  if (possibleIdMatch) {
+    const scannedId = possibleIdMatch[1];
+
+    // ask server if this ID is a staff badge
+    fetch("/api/badge_role", {
+      method: "POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({ id: scannedId })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res?.ok && res.found && (res.role === "ADMIN" || res.role === "TECH")) {
+        // unlock room selection
+        setLockState("", false);
+        applyLockUi();
+        showToast(`${res.role} badge accepted — room unlocked`, "ok");
+
+        // don't queue this scan
+        scanCooldownUntil = Date.now() + 800; // small cooldown after unlock
+      } else {
+        // not staff -> treat like normal student scan (queue it)
+        queue.push({ qr_text: t, manual: false, client_ts: now });
+        saveJson(QUEUE_KEY, queue);
+        updatePills();
+        showToast("Queued", "info");
+        maybeFlush(false);
+      }
+    })
+    .catch(() => {
+      // if endpoint fails, fallback to normal queue
+      queue.push({ qr_text: t, manual: false, client_ts: now });
+      saveJson(QUEUE_KEY, queue);
+      updatePills();
+      showToast("Queued", "info");
+      maybeFlush(false);
+    });
+
+    return; // IMPORTANT: prevent double-queuing
+  }
+
 
   queue.push({ qr_text: t, manual: false, client_ts: now });
   saveJson(QUEUE_KEY, queue);
