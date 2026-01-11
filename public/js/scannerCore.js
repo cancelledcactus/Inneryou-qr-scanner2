@@ -271,15 +271,25 @@ function stopCamera() {
 
 let lastScanText = "";
 let lastScanAt = 0;
+const SCAN_COOLDOWN_MS = 2000; // slower (adjust 1500–2500)
+let scanCooldownUntil = 0;
+
 
 function onScan(text) {
   const now = Date.now();
-  const t = String(text || "").trim();
+  const t = String(text || "").replace(/\u00A0/g, " ").trim();
 
-  // debounce double reads
-  if (t === lastScanText && (now - lastScanAt) < 900) return;
+  // hard cooldown
+  if (now < scanCooldownUntil) return;
+
+  // debounce exact same value
+  if (t === lastScanText && (now - lastScanAt) < SCAN_COOLDOWN_MS) return;
+
   lastScanText = t;
   lastScanAt = now;
+  scanCooldownUntil = now + SCAN_COOLDOWN_MS;
+
+  // (Admin/Tech badge handling will go here in section #3)
 
   queue.push({ qr_text: t, manual: false, client_ts: now });
   saveJson(QUEUE_KEY, queue);
@@ -288,6 +298,7 @@ function onScan(text) {
   showToast("Queued", "info");
   maybeFlush(false);
 }
+
 
 async function maybeFlush(force) {
   if (!isLocked) return;
