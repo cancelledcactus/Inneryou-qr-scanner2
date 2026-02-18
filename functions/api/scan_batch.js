@@ -76,7 +76,7 @@ export async function onRequestPost({ request, env }) {
   }
 }
 
-async function bumpSummary(DB, event_day, period_id, room_id, kind, studentId) {
+async function bumpSummary(DB, event_day, period_id, room_id, kind, studentId, name, grade, errorMsg) {
   const ok = kind === "ok" ? 1 : 0;
   const dup = kind === "dup" ? 1 : 0;
   const err = kind === "err" ? 1 : 0;
@@ -88,10 +88,23 @@ async function bumpSummary(DB, event_day, period_id, room_id, kind, studentId) {
         err_count = err_count + ?,
         last_ts = datetime('now'),
         last_student_id = COALESCE(?, last_student_id),
+        last_name = COALESCE(?, last_name),
+        last_grade = COALESCE(?, last_grade),
+        last_status = ?,
+        last_error = ?,
         last_heartbeat = datetime('now')
     WHERE event_day=? AND period_id=? AND room_id=?
-  `).bind(ok, dup, err, studentId, event_day, period_id, room_id).run();
+  `).bind(
+    ok, dup, err,
+    studentId,
+    name,
+    (typeof grade === "number" ? grade : null),
+    kind,
+    errorMsg || null,
+    event_day, period_id, room_id
+  ).run();
 }
+
 
 // timezone-safe "HH:MM" using Intl (Cloudflare runs in UTC otherwise)
 async function getCurrentPeriodId(DB, tz) {
