@@ -156,6 +156,74 @@ function setPeriodLabel(p) {
   saveJson(PERIOD_KEY, val);
 }
 
+/* ========================= */
+/* SUPPORT BUTTON HANDLERS */
+/* ========================= */
+
+const supportGeneralBtn = document.getElementById("supportGeneral");
+const supportScannerBtn = document.getElementById("supportScanner");
+
+if (supportGeneralBtn) {
+  supportGeneralBtn.addEventListener("click", async () => {
+    if (!isLocked || !lockedRoom) {
+      showToast("Lock room first", "warn");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/support_request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: lockedRoom,
+          support_type: "GENERAL"
+        })
+      }).then(r => r.json());
+
+      if (res?.ok) {
+        showFrameFeedback("🛠️", "General Support Requested");
+        pauseCameraThenResume(1500);
+      } else {
+        showToast("Support request failed", "err");
+      }
+
+    } catch (e) {
+      showToast("Support request error", "err");
+    }
+  });
+}
+
+if (supportScannerBtn) {
+  supportScannerBtn.addEventListener("click", async () => {
+    if (!isLocked || !lockedRoom) {
+      showToast("Lock room first", "warn");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/support_request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: lockedRoom,
+          support_type: "SCANNER"
+        })
+      }).then(r => r.json());
+
+      if (res?.ok) {
+        showFrameFeedback("📷", "Scanner Tech Support Requested");
+        pauseCameraThenResume(1500);
+      } else {
+        showToast("Support request failed", "err");
+      }
+
+    } catch (e) {
+      showToast("Support request error", "err");
+    }
+  });
+}
+
+
 /* ------------------ HEARTBEAT ------------------ */
 async function sendHeartbeat() {
   if (!isLocked || !lockedRoom) return;
