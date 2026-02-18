@@ -39,7 +39,8 @@ export async function onRequestPost({ request, env }) {
 
       if (!/^\d{9}$/.test(student_id || "")) {
         results.push({ status:"error", student_id:null });
-        await bumpSummary(DB, event_day, period_id, room_id, "err", null);
+        await bumpSummary(DB, event_day, period_id, room_id, "err", null, null, null, "Invalid QR / missing 9-digit ID");
+
         continue;
       }
 
@@ -55,15 +56,15 @@ export async function onRequestPost({ request, env }) {
         ).run();
 
         results.push({ status:"ok", student_id });
-        await bumpSummary(DB, event_day, period_id, room_id, "ok", student_id);
+        await bumpSummary(DB, event_day, period_id, room_id, "ok", student_id, name, grade, null);
 
       } catch (e) {
         if (String(e).includes("UNIQUE")) {
           results.push({ status:"duplicate", student_id });
-          await bumpSummary(DB, event_day, period_id, room_id, "dup", student_id);
+          await bumpSummary(DB, event_day, period_id, room_id, "dup", student_id, name, grade, "Duplicate scan");
         } else {
           results.push({ status:"error", student_id });
-          await bumpSummary(DB, event_day, period_id, room_id, "err", student_id);
+          await bumpSummary(DB, event_day, period_id, room_id, "err", student_id, name, grade, "DB insert error");
         }
       }
     }
