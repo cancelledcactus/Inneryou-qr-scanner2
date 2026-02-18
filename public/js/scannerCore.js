@@ -57,6 +57,66 @@ function showToast(msg, type="info") {
   setTimeout(() => (toast.style.opacity = "0"), 1200);
 }
 
+let deviceStatusTimer = null;
+
+async function sendDeviceStatus() {
+  if (!isLocked || !lockedRoom) return;
+
+  let battery_pct = null;
+  let charging = 0;
+  if (navigator.getBattery) {
+    try {
+      const b = await navigator.getBattery();
+      battery_pct = Math.round((b.level || 0) * 100);
+      charging = b.charging ? 1 : 0;
+    } catch {}
+  }
+
+  const payload = {
+    room_id: lockedRoom,
+    online: navigator.onLine ? 1 : 0,
+    battery_pct,
+    charging,
+    queue_len: queue.length,
+    scanning: scanning ? 1 : 0,
+    note: ""
+  };
+
+  try {
+    const res = await fetch("/api/device_status", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    }).then(r=>r.json());
+
+    // Remote controls (scanner reacts automatically)
+    if (res?.ok && res.control) {
+      const enabled = Number(res.control.scanner_enabled) !== 0;
+      const forceUnlock = Number(res.control.force_unlock) === 1;
+
+      if (!enabled) {
+        stopCamera();
+        showToast("Scanner disabled by admin", "warn");
+      }
+
+      if (forceUnlock) {
+        // unlock locally
+        setLockState("", false);
+        applyLockUi();
+        stopCamera();
+        showToast("Room unlocked by admin", "ok");
+      }
+    }
+  } catch {}
+}
+
+function startDeviceStatus() {
+  if (deviceStatusTimer) clearInterval(deviceStatusTimer);
+  deviceStatusTimer = setInterval(sendDeviceStatus, 15000);
+  sendDeviceStatus();
+}
+
+
 /* ------------------ NEW: QR DISPLAY PARSER ------------------ */
 function parseDisplayFromQrText(qrText) {
   const raw = String(qrText || "").replace(/\u00A0/g, " ").trim();
