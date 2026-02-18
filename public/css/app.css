@@ -107,3 +107,28 @@ button.danger{background:#7f1d1d}
   margin-top:6px;
   color:#fbbf24;
 }
+
+/* Tech dashboard: support badge + panel */
+.supportBadge{
+  margin-top:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  display:inline-block;
+  font-size:12px;
+  background:#7f1d1d;
+  border:1px solid rgba(255,255,255,.12);
+}
+.supportBadge.off{
+  background:#0f1720;
+  border:1px solid rgba(255,255,255,.06);
+  color:#9aa7b2;
+}
+
+.supportPanel{
+  margin-top:10px;
+  padding:12px;
+  border-radius:14px;
+  background:#0f1720;
+  border:1px solid rgba(255,255,255,.08);
+}
+
