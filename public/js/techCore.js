@@ -49,6 +49,7 @@ loginBtn.addEventListener("click", async () => {
   if (!/^\d{9}$/.test(id)) return alert("Enter a 9-digit ID");
   const res = await api("/api/login", { method:"POST", body: JSON.stringify({ id }) });
   if (!res?.ok || (res.role !== "TECH" && res.role !== "ADMIN")) return alert("Access denied");
+  idInput.value = "";
   setToken(res.token, res.role, res.idleTimeoutMs);
   showMain();
 });
