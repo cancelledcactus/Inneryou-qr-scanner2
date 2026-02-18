@@ -34,6 +34,9 @@
           <button class="tabBtn" data-tab="users">Users</button>
           <button class="tabBtn" data-tab="settings">Settings</button>
           <button class="tabBtn" data-tab="export">Export</button>
+          <button class="tabBtn" data-tab="support">Support</button>
+          <button class="tabBtn" data-tab="raffle">Raffle</button>
+          <button class="tabBtn" data-tab="announce">Announcements</button>
           <button class="tabBtn danger" data-tab="testing">Testing</button>
         </div>
 
@@ -165,7 +168,53 @@
           <div class="muted small" id="exportMsg"></div>
         </section>
 
-        <!-- Testing -->
+        
+        <!-- Support -->
+        <section class="tabPane hidden" id="tab-support">
+          <h2>Support</h2>
+          <div class="row">
+            <button id="supportOpenBtn" class="supportBtn">Open</button>
+            <button id="supportResolvedBtn" class="ghost">Resolved</button>
+          </div>
+          <div id="supportList" class="list"></div>
+        </section>
+
+        <!-- Raffle -->
+        <section class="tabPane hidden" id="tab-raffle">
+          <h2>Raffle</h2>
+          <div class="muted small">Eligible if student has scans in at least <b>N distinct periods</b> today (period grouping applies).</div>
+          <div class="row">
+            <label class="small muted">Min distinct periods</label>
+            <input id="raffleMinPeriods" inputmode="numeric" placeholder="4" style="max-width:120px">
+            <button id="raffleSaveCfg" class="ghost">Save</button>
+          </div>
+          <div class="row">
+            <input id="raffleGrade" inputmode="numeric" placeholder="Grade (blank=all)" style="max-width:160px">
+            <input id="raffleCount" inputmode="numeric" placeholder="# Winners" value="1" style="max-width:140px">
+            <button id="raffleDrawBtn">Draw</button>
+            <button id="raffleListBtn" class="ghost">List Eligible</button>
+          </div>
+          <div id="raffleOut" class="list"></div>
+        </section>
+
+        <!-- Announcements -->
+        <section class="tabPane hidden" id="tab-announce">
+          <h2>Announcements</h2>
+          <div class="muted small">Broadcast to scanners + dashboards.</div>
+          <label class="small muted">Level</label>
+          <select id="annLevel">
+            <option value="INFO">INFO</option>
+            <option value="URGENT">URGENT</option>
+          </select>
+          <label class="small muted">Message</label>
+          <input id="annMsg" placeholder="Type announcement message...">
+          <div class="row">
+            <button id="annSendBtn">Send</button>
+            <button id="annClearBtn" class="ghost">Clear</button>
+          </div>
+          <div id="annStatus" class="muted small"></div>
+        </section>
+<!-- Testing -->
         <section class="tabPane hidden" id="tab-testing">
           <h2>Testing Tools</h2>
           <div class="muted small">Careful: Purge deletes all scans + summaries.</div>
