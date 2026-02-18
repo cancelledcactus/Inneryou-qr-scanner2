@@ -43,6 +43,7 @@ const BATCH_SIZE_DEFAULT = 5;
 let BATCH_SIZE = BATCH_SIZE_DEFAULT;
 let FLUSH_MS = 12000;
 
+// heartbeat timer
 let heartbeatTimer = null;
 
 function loadJson(key, fallback) {
@@ -57,41 +58,13 @@ function showToast(msg, type="info") {
   setTimeout(() => (toast.style.opacity = "0"), 1200);
 }
 
-/* ------------------ NEW: QR DISPLAY PARSER ------------------ */
-function parseDisplayFromQrText(qrText) {
-  const raw = String(qrText || "").replace(/\u00A0/g, " ").trim();
-  const parts = raw.split(",").map(s => s.trim());
-
-  if (parts.length >= 2) {
-    return {
-      name: parts[0] || "",
-      id: parts[1] || "",
-      grade: parts[2] || ""
-    };
-  }
-  return { name: "", id: raw, grade: "" };
-}
-
-/* ------------------ UPDATED LOCAL LIST RENDER ------------------ */
 function renderLocalList() {
   localList.innerHTML = "";
   for (let i = localPeriodList.length - 1; i >= 0; i--) {
     const s = localPeriodList[i];
     const div = document.createElement("div");
     div.className = "listItem";
-
-    const who = s.name ? `${s.name} (${s.student_id})` : `${s.student_id}`;
-    const gradeText = s.grade ? ` • G${s.grade}` : "";
-
-    div.textContent =
-      `${who}${gradeText} ${
-        s.status === "duplicate"
-          ? "⚠️ DUP"
-          : s.status === "ok"
-          ? "✅"
-          : "❌"
-      }`;
-
+    div.textContent = `${s.student_id} ${s.status === "duplicate" ? "⚠️ DUP" : s.status === "ok" ? "✅" : "❌"}`;
     localList.appendChild(div);
   }
 }
@@ -102,6 +75,7 @@ function updatePills() {
   errPill.textContent = `Errors: ${errCount}`;
 }
 
+// NEW: pull batch/flush from /api/public_settings
 async function loadConfig() {
   const res = await fetch("/api/public_settings")
     .then(r => r.json())
@@ -113,10 +87,12 @@ async function loadConfig() {
   const bs = Number(s.batchSize || BATCH_SIZE_DEFAULT);
   const fm = Number(s.flushIntervalMs || 12000);
 
+  // clamp values for safety
   BATCH_SIZE = Math.max(1, Math.min(10, bs));
   FLUSH_MS = Math.max(2000, Math.min(60000, fm));
 }
 
+// NEW: load rooms from /api/public_rooms (no login required)
 async function loadRooms() {
   const res = await fetch("/api/public_rooms")
     .then(r => r.json())
@@ -150,81 +126,14 @@ function applyLockUi() {
   if (lockedRoom) roomSelect.value = lockedRoom;
 }
 
+// NEW: update period label + save to PERIOD_KEY
 function setPeriodLabel(p) {
   const val = p || "…";
   periodLabel.textContent = `Period: ${val}`;
   saveJson(PERIOD_KEY, val);
 }
 
-/* ========================= */
-/* SUPPORT BUTTON HANDLERS */
-/* ========================= */
-
-const supportGeneralBtn = document.getElementById("supportGeneral");
-const supportScannerBtn = document.getElementById("supportScanner");
-
-if (supportGeneralBtn) {
-  supportGeneralBtn.addEventListener("click", async () => {
-    if (!isLocked || !lockedRoom) {
-      showToast("Lock room first", "warn");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/support_request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room_id: lockedRoom,
-          support_type: "GENERAL"
-        })
-      }).then(r => r.json());
-
-      if (res?.ok) {
-        showFrameFeedback("🛠️", "General Support Requested");
-        pauseCameraThenResume(1500);
-      } else {
-        showToast("Support request failed", "err");
-      }
-
-    } catch (e) {
-      showToast("Support request error", "err");
-    }
-  });
-}
-
-if (supportScannerBtn) {
-  supportScannerBtn.addEventListener("click", async () => {
-    if (!isLocked || !lockedRoom) {
-      showToast("Lock room first", "warn");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/support_request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          room_id: lockedRoom,
-          support_type: "SCANNER"
-        })
-      }).then(r => r.json());
-
-      if (res?.ok) {
-        showFrameFeedback("📷", "Scanner Tech Support Requested");
-        pauseCameraThenResume(1500);
-      } else {
-        showToast("Support request failed", "err");
-      }
-
-    } catch (e) {
-      showToast("Support request error", "err");
-    }
-  });
-}
-
-
-/* ------------------ HEARTBEAT ------------------ */
+// NEW: heartbeat ping
 async function sendHeartbeat() {
   if (!isLocked || !lockedRoom) return;
   try {
@@ -237,69 +146,27 @@ async function sendHeartbeat() {
     if (res?.ok && res.period_id) {
       setPeriodLabel(res.period_id);
     }
-  } catch {}
+  } catch (e) {
+    // silent (don’t spam UI)
+  }
 }
 
 function startHeartbeat() {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(sendHeartbeat, 15000);
-  sendHeartbeat();
+  sendHeartbeat(); // immediate
 }
 
-/* ------------------ CAMERA FRAME FEEDBACK ------------------ */
-function showFrameFeedback(mark, msg) {
-  const frame = document.querySelector(".scanFrame");
-  if (!frame) return;
-
-  const markEl = document.getElementById("scanFrameMark");
-  const textEl = document.getElementById("scanFrameText");
-
-  if (markEl) markEl.textContent = mark;
-  if (textEl) textEl.textContent = msg;
-
-  frame.classList.add("show");
-}
-
-function hideFrameFeedback() {
-  const frame = document.querySelector(".scanFrame");
-  if (frame) frame.classList.remove("show");
-}
-
-function pauseCameraThenResume(ms) {
-  stopCamera();
-  setTimeout(async () => {
-    hideFrameFeedback();
-    if (isLocked) await startCamera();
-  }, ms);
-}
-
-/* ------------------ NYC CLOCK (UI ONLY) ------------------ */
-function startNYClock() {
-  const el = document.getElementById("nyTime");
-  if (!el) return;
-
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true
-  });
-
-  setInterval(() => {
-    el.textContent = `NYC: ${fmt.format(new Date())}`;
-  }, 1000);
-}
-
-/* ------------------ LOCK BUTTON ------------------ */
 lockBtn.addEventListener("click", async () => {
   if (!roomSelect.value) return showToast("Pick a room", "warn");
   setLockState(roomSelect.value, true);
   applyLockUi();
   showToast(`Locked: ${roomSelect.value}`, "ok");
+
+  // NEW: start heartbeat once locked
   startHeartbeat();
 });
 
-/* ------------------ MANUAL ENTRY ------------------ */
 manualBtn.addEventListener("click", () => {
   if (!isLocked) return showToast("Lock room first", "warn");
   mName.value = ""; mId.value = ""; mGrade.value = "";
@@ -312,27 +179,22 @@ mSave.addEventListener("click", () => {
   if (!/^\d{9}$/.test(sid)) return showToast("Student ID must be 9 digits", "warn");
 
   const nm = String(mName.value || "").trim();
-  if (!nm.includes(" ")) return showToast("Enter first AND last name", "warn");
-
   const gr = String(mGrade.value || "").trim();
-  if (!/^\d{1,2}$/.test(gr)) return showToast("Grade required", "warn");
-
-  const grade = Number(gr);
+  const grade = /^\d{1,2}$/.test(gr) ? Number(gr) : null;
 
   queue.push({
-    qr_text: `${nm} , ${sid} , ${grade}`.trim(),
+    qr_text: `${nm} , ${sid} , ${grade ?? ""}`.trim(),
     manual: true,
     client_ts: Date.now()
   });
-
   saveJson(QUEUE_KEY, queue);
   updatePills();
   showToast("Queued manual entry", "ok");
   modal.classList.add("hidden");
+
   maybeFlush(true);
 });
 
-/* ------------------ CAMERA START/STOP ------------------ */
 startBtn.addEventListener("click", async () => {
   if (!isLocked) return showToast("Lock room first", "warn");
   await startCamera();
@@ -343,30 +205,39 @@ async function startCamera() {
   if (scanning) return;
   if (!window.ZXing?.BrowserMultiFormatReader) return showToast("ZXing not loaded", "err");
 
+  // build video element that ZXing will attach to
   videoBox.innerHTML = `
     <video id="scannerVideo" autoplay playsinline muted style="width:100%;height:100%"></video>
   `;
 
   try {
     if (!codeReader) codeReader = new ZXing.BrowserMultiFormatReader();
+
+    // reset any previous decoding loop
     try { codeReader.reset(); } catch {}
 
+    // list cameras (this is what your old working code does)
     devices = await codeReader.listVideoInputDevices();
     if (!devices || devices.length === 0) {
       showToast("No camera found", "err");
       return;
     }
 
+    // Choose back camera (best-effort)
     const pickBack = (list) => {
+      // labels are often empty until permission is granted,
+      // but on many devices they contain "back"/"rear" after first allow.
       const preferred = list.find(d => /back|rear|environment/i.test(d.label || ""));
       return preferred?.deviceId || list[0].deviceId;
     };
 
+    // If we already picked one before, keep it. Otherwise pick back.
     if (!currentDeviceId) currentDeviceId = pickBack(devices);
 
     scanning = true;
     showToast("Scanning…", "info");
 
+    // IMPORTANT: old-style decode (most reliable for older iPads)
     codeReader.decodeFromVideoDevice(
       currentDeviceId,
       "scannerVideo",
@@ -376,6 +247,10 @@ async function startCamera() {
         if (result) {
           const text = (typeof result.getText === "function") ? result.getText() : (result.text || "");
           onScan(String(text || "").trim());
+        } else {
+          // NotFoundException is normal; ignore
+          // Other errors can be logged if needed:
+          // if (err && !(err instanceof ZXing.NotFoundException)) console.log(err);
         }
       }
     );
@@ -393,27 +268,33 @@ function stopCamera() {
   showToast("Camera stopped", "info");
 }
 
-/* ------------------ SCAN LOGIC (UNTOUCHED) ------------------ */
+
 let lastScanText = "";
 let lastScanAt = 0;
-const SCAN_COOLDOWN_MS = 2000;
+const SCAN_COOLDOWN_MS = 2000; // slower (adjust 1500–2500)
 let scanCooldownUntil = 0;
+
 
 function onScan(text) {
   const now = Date.now();
   const t = String(text || "").replace(/\u00A0/g, " ").trim();
 
+  // hard cooldown
   if (now < scanCooldownUntil) return;
+
+  // debounce exact same value
   if (t === lastScanText && (now - lastScanAt) < SCAN_COOLDOWN_MS) return;
 
   lastScanText = t;
   lastScanAt = now;
   scanCooldownUntil = now + SCAN_COOLDOWN_MS;
 
+    // If it looks like a 9-digit ID, check if it's an ADMIN/TECH badge
   const possibleIdMatch = t.match(/\b(\d{9})\b/);
   if (possibleIdMatch) {
     const scannedId = possibleIdMatch[1];
 
+    // ask server if this ID is a staff badge
     fetch("/api/badge_role", {
       method: "POST",
       headers: { "Content-Type":"application/json" },
@@ -422,11 +303,15 @@ function onScan(text) {
     .then(r => r.json())
     .then(res => {
       if (res?.ok && res.found && (res.role === "ADMIN" || res.role === "TECH")) {
+        // unlock room selection
         setLockState("", false);
         applyLockUi();
         showToast(`${res.role} badge accepted — room unlocked`, "ok");
-        scanCooldownUntil = Date.now() + 800;
+
+        // don't queue this scan
+        scanCooldownUntil = Date.now() + 800; // small cooldown after unlock
       } else {
+        // not staff -> treat like normal student scan (queue it)
         queue.push({ qr_text: t, manual: false, client_ts: now });
         saveJson(QUEUE_KEY, queue);
         updatePills();
@@ -435,6 +320,7 @@ function onScan(text) {
       }
     })
     .catch(() => {
+      // if endpoint fails, fallback to normal queue
       queue.push({ qr_text: t, manual: false, client_ts: now });
       saveJson(QUEUE_KEY, queue);
       updatePills();
@@ -442,20 +328,25 @@ function onScan(text) {
       maybeFlush(false);
     });
 
-    return;
+    return; // IMPORTANT: prevent double-queuing
   }
+
 
   queue.push({ qr_text: t, manual: false, client_ts: now });
   saveJson(QUEUE_KEY, queue);
   updatePills();
+
   showToast("Queued", "info");
   maybeFlush(false);
 }
 
-/* ------------------ FLUSH ------------------ */
+
 async function maybeFlush(force) {
   if (!isLocked) return;
-  if (force || queue.length >= BATCH_SIZE) flushQueue();
+
+  if (force || queue.length >= BATCH_SIZE) {
+    flushQueue();
+  }
 }
 
 let flushing = false;
@@ -482,25 +373,18 @@ async function flushQueue() {
       return;
     }
 
+    // NEW: update period label from server response
     if (res.period_id) setPeriodLabel(res.period_id);
 
+    // remove sent
     queue = queue.slice(batch.length);
     saveJson(QUEUE_KEY, queue);
 
-    for (let i = 0; i < (res.results || []).length; i++) {
-      const r = res.results[i];
-      const parsed = parseDisplayFromQrText(batch[i]?.qr_text || "");
-
+    for (const r of res.results || []) {
       if (r.status === "ok") sentCount++;
       if (r.status === "error") errCount++;
 
-      localPeriodList.push({
-        student_id: r.student_id || parsed.id || "UNKNOWN",
-        name: parsed.name || "",
-        grade: parsed.grade || "",
-        status: r.status
-      });
-
+      localPeriodList.push({ student_id: r.student_id || "UNKNOWN", status: r.status });
       if (localPeriodList.length > 120) localPeriodList.shift();
     }
 
@@ -509,19 +393,9 @@ async function flushQueue() {
     updatePills();
 
     const last = (res.results || []).slice(-1)[0];
-
-    if (last?.status === "ok") {
-      showFrameFeedback("✅", "Saved. Next student.");
-      pauseCameraThenResume(900);
-    }
-    else if (last?.status === "duplicate") {
-      showFrameFeedback("⚠️", "Duplicate scan.");
-      pauseCameraThenResume(1200);
-    }
-    else {
-      showFrameFeedback("❌", "Scan error.");
-      pauseCameraThenResume(1500);
-    }
+    if (last?.status === "ok") showToast("Saved ✅", "ok");
+    else if (last?.status === "duplicate") showToast("Duplicate ⚠️", "warn");
+    else showToast("Error ❌", "err");
 
   } catch (e) {
     errCount++;
@@ -539,17 +413,75 @@ function startFlushTimer() {
   }, FLUSH_MS);
 }
 
-/* ------------------ INIT ------------------ */
+// Init
 (async function init() {
   getLockState();
+  applyLockUi();
   await loadConfig();
   await loadRooms();
-  applyLockUi();
   renderLocalList();
   updatePills();
   setPeriodLabel(loadJson(PERIOD_KEY, "…"));
   startFlushTimer();
-  startNYClock();
 
+  // NEW: if already locked from earlier, start heartbeat
   if (isLocked && lockedRoom) startHeartbeat();
 })();
+
+
+/* ========================= */
+/* SUPPORT BUTTON HANDLERS */
+/* ========================= */
+
+const supportGeneralBtn = document.getElementById("supportGeneral");
+const supportScannerBtn = document.getElementById("supportScanner");
+
+if (supportGeneralBtn) {
+  supportGeneralBtn.addEventListener("click", async () => {
+    if (!isLocked || !lockedRoom) {
+      showToast("Lock room first", "warn");
+      return;
+    }
+    try {
+      const res = await fetch("/api/support_request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room_id: lockedRoom, support_type: "GENERAL" })
+      }).then(r => r.json());
+
+      if (res?.ok) {
+        showFrameFeedback("🛠️", "General Support Requested");
+        pauseCameraThenResume(1500);
+      } else {
+        showToast("Support request failed", "err");
+      }
+    } catch {
+      showToast("Support request error", "err");
+    }
+  });
+}
+
+if (supportScannerBtn) {
+  supportScannerBtn.addEventListener("click", async () => {
+    if (!isLocked || !lockedRoom) {
+      showToast("Lock room first", "warn");
+      return;
+    }
+    try {
+      const res = await fetch("/api/support_request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room_id: lockedRoom, support_type: "SCANNER" })
+      }).then(r => r.json());
+
+      if (res?.ok) {
+        showFrameFeedback("📷", "Scanner Tech Support Requested");
+        pauseCameraThenResume(1500);
+      } else {
+        showToast("Support request failed", "err");
+      }
+    } catch {
+      showToast("Support request error", "err");
+    }
+  });
+}
