@@ -1,3 +1,6 @@
+import { json } from "./_middleware";
+import { getNYParts, getActivePeriod } from "./_time";
+
 export async function onRequestPost({ request, env }) {
   try {
     const DB = env.DB;
@@ -11,8 +14,16 @@ export async function onRequestPost({ request, env }) {
     const room_id = String(body.room_id).trim();
     const items = body.items.slice(0, 10);
 
-    const event_day = new Date().toISOString().slice(0, 10);
-    const period_id = await getCurrentPeriodId(DB, "America/New_York");
+    const settings = await loadSettings(DB);
+    const allowNoPeriod = String(settings.testingAllowNoPeriod || "true") === "true";
+
+    const { event_day, hhmm } = getNYParts();
+    const { period_id, scan_enabled } = await getActivePeriod(DB, hhmm, allowNoPeriod);
+
+    // If scanning is disabled (eg lunch / after period 5), reject cleanly
+    if (!scan_enabled && period_id !== "NO_PERIOD") {
+      return json({ ok:false, error:"SCANNING_CLOSED", event_day, period_id }, 403);
+    }
 
     // ensure summary row exists
     await DB.prepare(`
@@ -25,22 +36,24 @@ export async function onRequestPost({ request, env }) {
     for (const it of items) {
       const raw = String(it.qr_text || "").replace(/\u00A0/g, " ").trim();
 
-      // Parse "NAME , ID , GRADE"
-      const parts = raw.split(",").map(s => s.trim());
+      // Parse "NAME , ID , GRADE" OR allow ID-only
       let name = null;
       let student_id = null;
       let grade = null;
 
+      const parts = raw.split(",").map(s => s.trim()).filter(s => s.length);
       if (parts.length >= 2) {
         name = parts[0] || null;
         student_id = parts[1] || null;
         if (parts[2] && /^\d{1,2}$/.test(parts[2])) grade = Number(parts[2]);
+      } else {
+        const m = raw.match(/\b(\d{9})\b/);
+        if (m) student_id = m[1];
       }
 
       if (!/^\d{9}$/.test(student_id || "")) {
         results.push({ status:"error", student_id:null });
         await bumpSummary(DB, event_day, period_id, room_id, "err", null, null, null, "Invalid QR / missing 9-digit ID");
-
         continue;
       }
 
@@ -69,7 +82,7 @@ export async function onRequestPost({ request, env }) {
       }
     }
 
-    return json({ ok:true, period_id, results });
+    return json({ ok:true, event_day, period_id, results });
 
   } catch (err) {
     console.error("scan_batch error", err);
@@ -82,63 +95,51 @@ async function bumpSummary(DB, event_day, period_id, room_id, kind, studentId, n
   const dup = kind === "dup" ? 1 : 0;
   const err = kind === "err" ? 1 : 0;
 
-  await DB.prepare(`
-    UPDATE room_period_summary
-    SET ok_count = ok_count + ?,
-        dup_count = dup_count + ?,
-        err_count = err_count + ?,
-        last_ts = datetime('now'),
-        last_student_id = COALESCE(?, last_student_id),
-        last_name = COALESCE(?, last_name),
-        last_grade = COALESCE(?, last_grade),
-        last_status = ?,
-        last_error = ?,
-        last_heartbeat = datetime('now')
-    WHERE event_day=? AND period_id=? AND room_id=?
-  `).bind(
-    ok, dup, err,
-    studentId,
-    name,
-    (typeof grade === "number" ? grade : null),
-    kind,
-    errorMsg || null,
-    event_day, period_id, room_id
-  ).run();
-}
-
-
-// timezone-safe "HH:MM" using Intl (Cloudflare runs in UTC otherwise)
-async function getCurrentPeriodId(DB, tz) {
-  const rows = await DB.prepare(`
-    SELECT period_id, start_time, end_time
-    FROM periods
-    WHERE active=1
-    ORDER BY sort_order ASC
-  `).all();
-
-  const cur = getTimeHHMM(tz); // "09:12"
-  for (const p of rows.results || []) {
-    if (p.start_time <= cur && cur < p.end_time) return p.period_id;
+  // Try extended columns; fallback silently if not migrated yet
+  try {
+    await DB.prepare(`
+      UPDATE room_period_summary
+      SET ok_count = ok_count + ?,
+          dup_count = dup_count + ?,
+          err_count = err_count + ?,
+          last_ts = datetime('now'),
+          last_student_id = COALESCE(?, last_student_id),
+          last_name = COALESCE(?, last_name),
+          last_grade = COALESCE(?, last_grade),
+          last_status = ?,
+          last_error = ?,
+          last_heartbeat = datetime('now')
+      WHERE event_day=? AND period_id=? AND room_id=?
+    `).bind(
+      ok, dup, err,
+      studentId,
+      name,
+      (typeof grade === "number" ? grade : null),
+      kind,
+      errorMsg || null,
+      event_day, period_id, room_id
+    ).run();
+  } catch {
+    await DB.prepare(`
+      UPDATE room_period_summary
+      SET ok_count = ok_count + ?,
+          dup_count = dup_count + ?,
+          err_count = err_count + ?,
+          last_ts = datetime('now'),
+          last_student_id = COALESCE(?, last_student_id),
+          last_heartbeat = datetime('now')
+      WHERE event_day=? AND period_id=? AND room_id=?
+    `).bind(ok, dup, err, studentId, event_day, period_id, room_id).run();
   }
-  return "NO_PERIOD";
 }
 
-function getTimeHHMM(tz) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-  const parts = fmt.formatToParts(new Date());
-  const hh = parts.find(p => p.type === "hour")?.value ?? "00";
-  const mm = parts.find(p => p.type === "minute")?.value ?? "00";
-  return `${hh}:${mm}`;
-}
-
-function json(obj, status=200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { "Content-Type":"application/json" }
-  });
+async function loadSettings(DB) {
+  try {
+    const rows = await DB.prepare("SELECT key, value FROM settings").all();
+    const out = {};
+    for (const r of rows.results || []) out[r.key] = r.value;
+    return out;
+  } catch {
+    return {};
+  }
 }
