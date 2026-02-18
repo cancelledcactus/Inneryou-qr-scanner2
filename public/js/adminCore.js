@@ -197,7 +197,7 @@ function renderGrid(rooms) {
 
     const lastErr = (r.last_status === "err" && r.last_error) ? r.last_error : "";
 
-    const hb = r.last_heartbeat ? fmtNYTime(r.last_heartbeat) : "—";
+    const hb = r.last_heartbeat ? fmtNY(r.last_heartbeat) : "—";
 
     // device health (from backend join) - be tolerant if fields aren't present yet
     const devOnline =
