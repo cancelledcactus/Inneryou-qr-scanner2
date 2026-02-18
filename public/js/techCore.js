@@ -292,75 +292,95 @@ function formatNYTime(isoOrSqlite) {
 
 /* Badge scan login: keep EXACT behavior (scan -> extract 9 digits -> login) */
 async function scanOneQrForId() {
-  if (!navigator.mediaDevices?.getUserMedia) { alert("Camera not supported"); return null; }
-  if (!window.ZXing?.BrowserMultiFormatReader) { alert("ZXing missing"); return null; }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert("Camera not supported");
+    return null;
+  }
+  if (!window.ZXing?.BrowserMultiFormatReader) {
+    alert("ZXing missing");
+    return null;
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "scanOverlay";
   overlay.innerHTML = `
     <div class="scanOverlayCard">
       <h3>Scan your ID badge</h3>
-      <div id="scanVid" class="videoBox" style="aspect-ratio:1/1; margin-top:10px;"></div>
+      <div id="scanVidWrap" class="videoBox" style="aspect-ratio:1/1;margin-top:10px;position:relative;"></div>
       <div class="muted small" style="margin-top:8px;">Align QR in the box</div>
       <button id="cancelScan" class="ghost" style="margin-top:10px;">Cancel</button>
     </div>
   `;
   document.body.appendChild(overlay);
 
-  const vidWrap = overlay.querySelector("#scanVid");
-  const cancel = overlay.querySelector("#cancelScan");
+  const vidWrap = overlay.querySelector("#scanVidWrap");
+  const cancelBtn = overlay.querySelector("#cancelScan");
 
-  // frame like scanner
-  const frame = document.createElement("div");
-  frame.className = "scanFrame";
-  frame.innerHTML = `<div class="scanFrameMark">📷</div><div class="scanFrameText">Scan Badge</div>`;
-  vidWrap.appendChild(frame);
+  vidWrap.innerHTML = `
+    <video id="techScannerVideo" autoplay playsinline muted style="width:100%;height:100%"></video>
+    <div class="scanFrame">
+      <div class="scanFrameMark">📷</div>
+      <div class="scanFrameText">Scan Badge</div>
+    </div>
+  `;
 
-  const video = document.createElement("video");
-  video.setAttribute("playsinline","");
-  video.autoplay = true;
-  video.muted = true;
-  video.style.width = "100%";
-  video.style.height = "100%";
-  vidWrap.appendChild(video);
-
-  codeReader = codeReader || new ZXing.BrowserMultiFormatReader();
+  const videoId = "techScannerVideo";
 
   let done = false;
-  cancel.onclick = () => { done = true; cleanup(); };
+  let localReader = new ZXing.BrowserMultiFormatReader();
+
+  function cleanup() {
+    done = true;
+    try { localReader.reset(); } catch {}
+    overlay.remove();
+  }
+
+  cancelBtn.onclick = cleanup;
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ ideal:"environment" } } });
-    video.srcObject = mediaStream;
-    await video.play();
+    const devices = await localReader.listVideoInputDevices();
+    if (!devices || devices.length === 0) {
+      alert("No camera found");
+      cleanup();
+      return null;
+    }
+
+    const pickBack = (list) => {
+      const preferred = list.find(d => /back|rear|environment/i.test(d.label || ""));
+      return preferred?.deviceId || list[0].deviceId;
+    };
+
+    const deviceId = pickBack(devices);
 
     return await new Promise((resolve) => {
-      codeReader.decodeFromVideoElement(video, (result) => {
-        if (done) return;
-        if (result) {
-          const txt = result.getText();
-          const m = String(txt).match(/\b(\d{9})\b/);
-          if (m) {
-            done = true;
-            cleanup();
-            resolve(m[1]);
+      localReader.decodeFromVideoDevice(
+        deviceId,
+        videoId,
+        (result, err) => {
+          if (done) return;
+
+          if (result) {
+            const txt = (typeof result.getText === "function")
+              ? result.getText()
+              : (result.text || "");
+
+            const m = String(txt).match(/\b(\d{9})\b/);
+            if (m) {
+              cleanup();
+              resolve(m[1]);
+            }
           }
         }
-      });
-
-      function cleanup() {
-        try { codeReader.reset(); } catch {}
-        try { mediaStream?.getTracks()?.forEach(t=>t.stop()); } catch {}
-        overlay.remove();
-      }
+      );
     });
 
   } catch (e) {
-    alert("Camera blocked");
-    overlay.remove();
+    alert("Camera blocked or failed.");
+    cleanup();
     return null;
   }
 }
+
 
 startIdleWatcher(() => {
   alert("Logged out (idle)");
