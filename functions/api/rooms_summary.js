@@ -18,7 +18,10 @@ export async function onRequestGet({ request, env }) {
     ORDER BY sort_order ASC, room_id ASC
   `).all();
 
-  // Attempt to read extended summary fields; fallback if columns don't exist yet
+  /* ======================================================
+     SUMMARY DATA (your existing logic, untouched)
+  ====================================================== */
+
   let summary;
   try {
     summary = await env.DB.prepare(`
@@ -38,31 +41,89 @@ export async function onRequestGet({ request, env }) {
     `).bind(event_day, period_id).all();
   }
 
-  const map = new Map();
-  for (const s of summary.results || []) map.set(s.room_id, s);
+  const summaryMap = new Map();
+  for (const s of summary.results || []) summaryMap.set(s.room_id, s);
+
+  /* ======================================================
+     NEW: DEVICE STATUS JOIN (SAFE FALLBACK)
+  ====================================================== */
+
+  let deviceStatus;
+  try {
+    deviceStatus = await env.DB.prepare(`
+      SELECT room_id,
+             last_seen_ts,
+             online,
+             battery_pct,
+             charging,
+             queue_len,
+             scanning,
+             scanner_enabled
+      FROM room_device_status
+    `).all();
+  } catch {
+    deviceStatus = { results: [] };
+  }
+
+  const deviceMap = new Map();
+  for (const d of deviceStatus.results || []) {
+    deviceMap.set(d.room_id, d);
+  }
+
+  /* ======================================================
+     FINAL OUTPUT
+  ====================================================== */
 
   const out = (rooms.results || []).map(r => {
-    const s = map.get(r.room_id) || {};
+    const s = summaryMap.get(r.room_id) || {};
+    const d = deviceMap.get(r.room_id) || {};
+
     return {
       room_id: r.room_id,
+
       ok_count: s.ok_count || 0,
       dup_count: s.dup_count || 0,
       err_count: s.err_count || 0,
+
       last_ts: s.last_ts || null,
       last_student_id: s.last_student_id || null,
       last_name: s.last_name || null,
       last_grade: (typeof s.last_grade === "number") ? s.last_grade : null,
       last_status: s.last_status || null,
       last_error: s.last_error || null,
+
       help_flag: (s.help_flag || 0) ? 1 : 0,
       support_type: s.support_type || null,
       support_ts: s.support_ts || null,
+
       last_heartbeat: s.last_heartbeat || null,
+
+      /* ===========================
+         NEW DEVICE HEALTH FIELDS
+      =========================== */
+
+      dev_last_seen: d.last_seen_ts || null,
+      dev_online: (typeof d.online === "number") ? d.online : null,
+      dev_battery_pct: (typeof d.battery_pct === "number") ? d.battery_pct : null,
+      dev_charging: (typeof d.charging === "number") ? d.charging : null,
+      dev_queue_len: (typeof d.queue_len === "number") ? d.queue_len : null,
+      dev_scanning: (typeof d.scanning === "number") ? d.scanning : null,
+      dev_scanner_enabled: (typeof d.scanner_enabled === "number") ? d.scanner_enabled : null,
     };
   });
 
-  return json({ ok:true, event_day, period_id, ny_hhmm: hhmm, rooms: out });
+  return json({
+    ok: true,
+    event_day,
+    period_id,
+    ny_hhmm: hhmm,
+    rooms: out
+  });
 }
+
+/* ======================================================
+   SETTINGS
+====================================================== */
 
 async function loadSettings(DB) {
   try {
@@ -74,6 +135,10 @@ async function loadSettings(DB) {
     return {};
   }
 }
+
+/* ======================================================
+   AUTH
+====================================================== */
 
 async function requireTechOrAdmin(request, env) {
   const auth = request.headers.get("Authorization") || "";
@@ -91,9 +156,16 @@ async function verifyToken(env, token) {
   if (sig !== expected) return null;
   try { return JSON.parse(decodeURIComponent(escape(atob(data)))); } catch { return null; }
 }
+
 async function hmac(secret, data) {
   const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name:"HMAC", hash:"SHA-256" },
+    false,
+    ["sign"]
+  );
   const signature = await crypto.subtle.sign("HMAC", key, enc.encode(data));
   return btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=+$/g, "");
 }
