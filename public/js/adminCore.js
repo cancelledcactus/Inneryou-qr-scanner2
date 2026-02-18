@@ -169,6 +169,35 @@ function startLoops() {
   liveInterval = setInterval(refreshLive, 3000);
 }
 
+/* =========================
+   NYC TIME FORMATTER (FIXED)
+========================= */
+function fmtNYTime(isoOrSql) {
+  if (!isoOrSql) return "—";
+
+  try {
+    const s = String(isoOrSql);
+
+    // Support both ISO and SQLite datetime formats
+    const d = s.includes("T")
+      ? new Date(s)
+      : new Date(s.replace(" ", "T") + "Z");
+
+    if (isNaN(d.getTime())) return "—";
+
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    }).format(d);
+
+  } catch {
+    return "—";
+  }
+}
+
 async function refreshLive() {
   touchActivity();
   const res = await api("/api/rooms_summary");
@@ -764,6 +793,12 @@ if (annClearBtn) annClearBtn.addEventListener("click", async () => {
     showToast("Announcement cleared", "ok");
   }
 });
+/* =========================
+   TOAST (ADMIN SAFE)
+========================= */
+function showToast(msg, type = "info") {
+  console.log(`[${type.toUpperCase()}] ${msg}`);
+}
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
