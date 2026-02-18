@@ -69,6 +69,7 @@ function parseDisplayFromQrText(qrText) {
       grade: parts[2] || ""
     };
   }
+
   return { name: "", id: raw, grade: "" };
 }
 
@@ -539,6 +540,230 @@ function startFlushTimer() {
   }, FLUSH_MS);
 }
 
+/* ========================= */
+/* ANNOUNCEMENT BANNER (PERSISTENT + AUTO-UPDATE) */
+/* ========================= */
+
+let announcementPollTimer = null;
+let lastAnnouncementId = null;
+
+function ensureAnnouncementBanner() {
+  let banner = document.getElementById("announcementBanner");
+  if (banner) return banner;
+
+  banner = document.createElement("div");
+  banner.id = "announcementBanner";
+  banner.style.position = "fixed";
+  banner.style.top = "0";
+  banner.style.left = "0";
+  banner.style.right = "0";
+  banner.style.zIndex = "9999";
+  banner.style.padding = "16px 14px";
+  banner.style.fontSize = "22px";
+  banner.style.fontWeight = "900";
+  banner.style.textAlign = "center";
+  banner.style.display = "none";
+  banner.style.boxShadow = "0 6px 18px rgba(0,0,0,.35)";
+  banner.style.cursor = "pointer";
+  banner.style.userSelect = "none";
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+
+  // tap to dismiss locally (it will come back if still active on server)
+  banner.addEventListener("click", () => {
+    banner.style.display = "none";
+  });
+
+  document.body.appendChild(banner);
+
+  // push page content down so banner doesn't cover title
+  document.body.style.paddingTop = "64px";
+
+  return banner;
+}
+
+function setBannerVisible(visible) {
+  const banner = ensureAnnouncementBanner();
+  banner.style.display = visible ? "block" : "none";
+  document.body.style.paddingTop = visible ? "64px" : "0px";
+}
+
+function setBannerContent(message, level) {
+  const banner = ensureAnnouncementBanner();
+  banner.textContent = message;
+
+  // Big, obvious colors; stays readable on old iPads
+  if (String(level).toUpperCase() === "URGENT") {
+    banner.style.background = "#7f1d1d";
+    banner.style.color = "#ffffff";
+  } else {
+    banner.style.background = "#1e3a8a";
+    banner.style.color = "#ffffff";
+  }
+}
+
+async function pollAnnouncement() {
+  try {
+    const res = await fetch("/api/announcement_current", { cache: "no-store" })
+      .then(r => r.json())
+      .catch(() => null);
+
+    // If no active announcement, hide banner
+    if (!res?.ok || !res.announcement || !res.announcement.message) {
+      lastAnnouncementId = null;
+      setBannerVisible(false);
+      return;
+    }
+
+    const a = res.announcement;
+
+    // If new announcement id, show immediately
+    if (a.id !== lastAnnouncementId) {
+      lastAnnouncementId = a.id;
+      showToast("New announcement", "warn");
+    }
+
+    setBannerContent(a.message, a.level);
+    setBannerVisible(true);
+  } catch {
+    // If offline, keep last banner state (do nothing)
+  }
+}
+
+function startAnnouncementPolling() {
+  if (announcementPollTimer) clearInterval(announcementPollTimer);
+  announcementPollTimer = setInterval(pollAnnouncement, 6000);
+  pollAnnouncement();
+}
+
+/* ========================= */
+/* HEALTH MONITOR (ONLINE/OFFLINE + BATTERY) */
+/* ========================= */
+
+let healthTimer = null;
+
+function ensureHealthRow() {
+  let row = document.getElementById("healthRow");
+  if (row) return row;
+
+  // Try to place it under the pills row if possible
+  const pillsRow = document.getElementById("queuePill")?.parentElement;
+  row = document.createElement("div");
+  row.id = "healthRow";
+  row.className = "row";
+  row.style.marginTop = "8px";
+  row.style.gap = "8px";
+  row.style.flexWrap = "wrap";
+
+  row.innerHTML = `
+    <div class="pill" id="netPill">Net: …</div>
+    <div class="pill" id="batPill">Battery: …</div>
+    <div class="pill" id="syncPill">Sync: …</div>
+  `;
+
+  if (pillsRow && pillsRow.parentElement) {
+    pillsRow.parentElement.insertBefore(row, pillsRow.nextSibling);
+  } else {
+    document.body.appendChild(row);
+  }
+
+  return row;
+}
+
+function setPillText(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
+
+async function updateBatteryPill() {
+  ensureHealthRow();
+
+  // Battery API not supported on all iPads; handle gracefully
+  if (!navigator.getBattery) {
+    setPillText("batPill", "Battery: (n/a)");
+    return;
+  }
+
+  try {
+    const b = await navigator.getBattery();
+    const pct = Math.round((b.level || 0) * 100);
+    const charging = b.charging ? "⚡" : "";
+    setPillText("batPill", `Battery: ${pct}% ${charging}`);
+  } catch {
+    setPillText("batPill", "Battery: (n/a)");
+  }
+}
+
+function updateNetworkPill() {
+  ensureHealthRow();
+  const online = navigator.onLine;
+  setPillText("netPill", online ? "Net: Online ✅" : "Net: Offline ❌");
+}
+
+function updateSyncPill() {
+  ensureHealthRow();
+  // Simple indicator: if we have queued items, show that
+  if (queue.length > 0) {
+    setPillText("syncPill", `Sync: Queue ${queue.length} ⚠️`);
+  } else {
+    setPillText("syncPill", "Sync: OK ✅");
+  }
+}
+
+function startHealthMonitor() {
+  ensureHealthRow();
+  updateNetworkPill();
+  updateBatteryPill();
+  updateSyncPill();
+
+  window.addEventListener("online", () => {
+    updateNetworkPill();
+    showToast("Back online", "ok");
+  });
+
+  window.addEventListener("offline", () => {
+    updateNetworkPill();
+    showToast("Offline mode", "warn");
+  });
+
+  if (healthTimer) clearInterval(healthTimer);
+  healthTimer = setInterval(() => {
+    updateNetworkPill();
+    updateBatteryPill();
+    updateSyncPill();
+  }, 15000);
+}
+
+/* ========================= */
+/* AUTO-REFRESH (ROOMS + SETTINGS) */
+/* ========================= */
+
+let autoRefreshTimer = null;
+
+async function refreshRoomsAndSettings() {
+  try {
+    // rooms
+    const prevRoom = lockedRoom || roomSelect?.value || "";
+    const prevLocked = isLocked;
+
+    await loadRooms();
+    // restore selection/lock UI
+    if (prevRoom) roomSelect.value = prevRoom;
+    lockedRoom = prevRoom || lockedRoom;
+    isLocked = prevLocked;
+    applyLockUi();
+
+    // settings
+    await loadConfig();
+  } catch {}
+}
+
+function startAutoRefresh() {
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(refreshRoomsAndSettings, 15000);
+  refreshRoomsAndSettings();
+}
+
 /* ------------------ INIT ------------------ */
 (async function init() {
   getLockState();
@@ -550,6 +775,9 @@ function startFlushTimer() {
   setPeriodLabel(loadJson(PERIOD_KEY, "…"));
   startFlushTimer();
   startNYClock();
+  startAnnouncementPolling();
+  startHealthMonitor();
+  startAutoRefresh();
 
   if (isLocked && lockedRoom) startHeartbeat();
 })();
