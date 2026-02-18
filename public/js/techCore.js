@@ -89,6 +89,10 @@ supportCloseBtn.addEventListener("click", () => supportPanel.classList.add("hidd
 function showLogin() {
   loginBox.classList.remove("hidden");
   main.classList.add("hidden");
+
+  idInput.value = "";
+  idInput.focus();
+
   if (refreshTimer) clearInterval(refreshTimer);
   if (supportTimer) clearInterval(supportTimer);
 }
