@@ -19,12 +19,37 @@ const panes = {
   settings: document.getElementById("tab-settings"),
   export: document.getElementById("tab-export"),
   testing: document.getElementById("tab-testing"),
+  support: document.getElementById("tab-support"),
+  raffle: document.getElementById("tab-raffle"),
+  announce: document.getElementById("tab-announce"),
 };
 
 // Live
 const grid = document.getElementById("grid");
 const periodPill = document.getElementById("periodPill");
 const dayPill = document.getElementById("dayPill");
+
+// Support
+const supportOpenBtn = document.getElementById("supportOpenBtn");
+const supportResolvedBtn = document.getElementById("supportResolvedBtn");
+const supportList = document.getElementById("supportList");
+let supportMode = "OPEN";
+
+// Raffle
+const raffleMinPeriods = document.getElementById("raffleMinPeriods");
+const raffleSaveCfg = document.getElementById("raffleSaveCfg");
+const raffleGrade = document.getElementById("raffleGrade");
+const raffleCount = document.getElementById("raffleCount");
+const raffleDrawBtn = document.getElementById("raffleDrawBtn");
+const raffleListBtn = document.getElementById("raffleListBtn");
+const raffleOut = document.getElementById("raffleOut");
+
+// Announcements
+const annLevel = document.getElementById("annLevel");
+const annMsg = document.getElementById("annMsg");
+const annSendBtn = document.getElementById("annSendBtn");
+const annClearBtn = document.getElementById("annClearBtn");
+const annStatus = document.getElementById("annStatus");
 
 // Modal
 const roomModal = document.getElementById("roomModal");
@@ -472,54 +497,191 @@ async function scanOneQrForId() {
 
   const overlay = document.createElement("div");
   overlay.className = "scanOverlay";
-  overlay.innerHTML = `<div class="scanOverlayCard"><h3>Scan your Admin badge</h3><div id="scanVid"></div><button id="cancelScan" class="ghost">Cancel</button></div>`;
+  overlay.innerHTML = `
+    <div class="scanOverlayCard">
+      <h3>Scan your Admin badge</h3>
+      <div id="scanVidWrap" class="videoBox" style="aspect-ratio:1/1;margin-top:10px;position:relative;"></div>
+      <div class="muted small" style="margin-top:8px;">Align QR in the box</div>
+      <button id="cancelScan" class="ghost" style="margin-top:10px;">Cancel</button>
+    </div>
+  `;
   document.body.appendChild(overlay);
 
-  const vidWrap = overlay.querySelector("#scanVid");
-  const cancel = overlay.querySelector("#cancelScan");
+  const vidWrap = overlay.querySelector("#scanVidWrap");
+  const cancelBtn = overlay.querySelector("#cancelScan");
 
-  const video = document.createElement("video");
-  video.setAttribute("playsinline","");
-  video.autoplay = true;
-  video.muted = true;
-  video.style.width = "100%";
-  vidWrap.appendChild(video);
+  vidWrap.innerHTML = `
+    <video id="adminScannerVideo" autoplay playsinline muted style="width:100%;height:100%"></video>
+    <div class="scanFrame">
+      <div class="scanFrameMark">📷</div>
+      <div class="scanFrameText">Scan Badge</div>
+    </div>
+  `;
 
-  const codeReader = new ZXing.BrowserMultiFormatReader();
-  let mediaStream = null;
   let done = false;
-  cancel.onclick = () => { done = true; cleanup(); };
+  const localReader = new ZXing.BrowserMultiFormatReader();
+
+  function cleanup() {
+    done = true;
+    try { localReader.reset(); } catch {}
+    overlay.remove();
+  }
+
+  cancelBtn.onclick = cleanup;
 
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ ideal:"environment" } } });
-    video.srcObject = mediaStream;
-    await video.play();
+    const devices = await localReader.listVideoInputDevices();
+    if (!devices || devices.length === 0) {
+      alert("No camera found");
+      cleanup();
+      return null;
+    }
+
+    const pickBack = (list) => {
+      const preferred = list.find(d => /back|rear|environment/i.test(d.label || ""));
+      return preferred?.deviceId || list[0].deviceId;
+    };
+
+    const deviceId = pickBack(devices);
 
     return await new Promise((resolve) => {
-      codeReader.decodeFromVideoElement(video, (result) => {
-        if (done) return;
-        if (result) {
-          const txt = result.getText();
-          const m = String(txt).match(/\b(\d{9})\b/);
-          if (m) {
-            done = true;
-            cleanup();
-            resolve(m[1]);
+      localReader.decodeFromVideoDevice(
+        deviceId,
+        "adminScannerVideo",
+        (result) => {
+          if (done) return;
+          if (result) {
+            const txt = (typeof result.getText === "function") ? result.getText() : (result.text || "");
+            const m = String(txt).match(/\b(\d{9})\b/);
+            if (m) {
+              cleanup();
+              resolve(m[1]);
+            }
           }
         }
-      });
-
-      function cleanup() {
-        try { codeReader.reset(); } catch {}
-        try { mediaStream?.getTracks()?.forEach(t=>t.stop()); } catch {}
-        overlay.remove();
-      }
+      );
     });
+
   } catch (e) {
-    alert("Camera blocked");
-    overlay.remove();
+    alert("Camera blocked or failed.");
+    cleanup();
     return null;
   }
+}
+
+/* =========================
+   SUPPORT TAB
+========================= */
+if (supportOpenBtn) supportOpenBtn.addEventListener("click", async () => { supportMode="OPEN"; await refreshSupport(); });
+if (supportResolvedBtn) supportResolvedBtn.addEventListener("click", async () => { supportMode="RESOLVED"; await refreshSupport(); });
+
+async function refreshSupport() {
+  if (!supportList) return;
+  const res = await api(`/api/support_list?status=${encodeURIComponent(supportMode)}`);
+  if (!res?.ok) return;
+
+  supportList.innerHTML = "";
+  const items = res.items || [];
+  if (!items.length) {
+    const d=document.createElement("div"); d.className="listItem"; d.textContent="No items"; supportList.appendChild(d);
+    return;
+  }
+  for (const it of items) {
+    const d=document.createElement("div");
+    d.className="listItem";
+    d.innerHTML = `
+      <div class="row between">
+        <div><b>${escapeHtml(it.room_id)}</b> • ${escapeHtml(it.support_type)} • <span class="muted">${escapeHtml(it.created_ts || "")}</span></div>
+        ${it.status==="OPEN" ? `<button class="ghost" data-resolve="${escapeHtml(it.req_id)}">Resolve</button>` : ""}
+      </div>
+      ${it.note ? `<div class="small muted">${escapeHtml(it.note)}</div>` : ""}
+    `;
+    supportList.appendChild(d);
+  }
+  supportList.querySelectorAll("button[data-resolve]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const req_id = btn.getAttribute("data-resolve");
+      if (!req_id) return;
+      if (!confirm("Resolve support request?")) return;
+      const r = await api("/api/support_resolve", { method:"POST", body: JSON.stringify({ req_id }) });
+      if (r?.ok) refreshSupport();
+    });
+  });
+}
+
+/* =========================
+   RAFFLE TAB
+========================= */
+if (raffleSaveCfg) raffleSaveCfg.addEventListener("click", async () => {
+  const v = Number(raffleMinPeriods?.value || 4) || 4;
+  const res = await api("/api/admin_raffle_config", { method:"POST", body: JSON.stringify({ min_distinct_periods: v }) });
+  if (res?.ok) showToast(`Saved min periods = ${res.min_distinct_periods}`, "ok");
+});
+
+if (raffleDrawBtn) raffleDrawBtn.addEventListener("click", async () => {
+  if (!raffleOut) return;
+  raffleOut.innerHTML = "";
+  const n = Number(raffleCount?.value || 1) || 1;
+  const g = String(raffleGrade?.value || "").trim();
+  const body = g ? { n, grade: g } : { n };
+  const res = await api("/api/admin_raffle_draw", { method:"POST", body: JSON.stringify(body) });
+  if (!res?.ok) return;
+
+  for (const w of (res.winners || [])) {
+    const d=document.createElement("div");
+    d.className="listItem";
+    d.textContent = `${w.name || "—"} • ${w.student_id} • G${w.grade ?? "—"} • periods=${w.periods}`;
+    raffleOut.appendChild(d);
+  }
+  if (!res.winners?.length) {
+    const d=document.createElement("div"); d.className="listItem"; d.textContent="No eligible students"; raffleOut.appendChild(d);
+  }
+});
+
+if (raffleListBtn) raffleListBtn.addEventListener("click", async () => {
+  if (!raffleOut) return;
+  raffleOut.innerHTML = "";
+  const g = String(raffleGrade?.value || "").trim();
+  const url = g ? `/api/admin_raffle_candidates?grade=${encodeURIComponent(g)}` : "/api/admin_raffle_candidates";
+  const res = await api(url);
+  if (!res?.ok) return;
+
+  const top = (res.items || []).slice(0, 200);
+  for (const it of top) {
+    const d=document.createElement("div");
+    d.className="listItem";
+    d.textContent = `${it.name || "—"} • ${it.student_id} • G${it.grade ?? "—"} • periods=${it.periods}`;
+    raffleOut.appendChild(d);
+  }
+  if (!top.length) {
+    const d=document.createElement("div"); d.className="listItem"; d.textContent="No eligible students"; raffleOut.appendChild(d);
+  }
+});
+
+/* =========================
+   ANNOUNCEMENTS TAB
+========================= */
+if (annSendBtn) annSendBtn.addEventListener("click", async () => {
+  const message = String(annMsg?.value || "").trim();
+  const level = String(annLevel?.value || "INFO").trim();
+  if (!message) return alert("Message required");
+  const res = await api("/api/admin_announcement", { method:"POST", body: JSON.stringify({ message, level, active: true }) });
+  if (res?.ok) {
+    if (annStatus) annStatus.textContent = "Sent.";
+    showToast("Announcement sent", "ok");
+  }
+});
+
+if (annClearBtn) annClearBtn.addEventListener("click", async () => {
+  const res = await api("/api/admin_announcement", { method:"DELETE" });
+  if (res?.ok) {
+    if (annStatus) annStatus.textContent = "Cleared.";
+    showToast("Announcement cleared", "ok");
+  }
+});
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 startIdleWatcher(() => {
