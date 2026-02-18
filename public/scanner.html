@@ -10,6 +10,10 @@
   <div class="wrap">
     <div class="card">
       <h1>Room Scanner</h1>
+
+      <!-- NEW: NYC Clock -->
+      <div class="muted" id="nyTime"></div>
+
       <div class="muted" id="periodLabel">Period: …</div>
 
       <div class="row">
@@ -17,14 +21,29 @@
         <button id="lockBtn">Lock</button>
       </div>
 
+      <!-- NEW: Locked message hint -->
+      <div id="lockedHint" class="muted small"></div>
+
       <div class="row">
         <button id="startBtn">Start Camera</button>
         <button id="stopBtn" class="ghost">Stop</button>
         <button id="manualBtn" class="ghost">Manual Add</button>
       </div>
 
+      <!-- NEW: Support Buttons -->
+      <div class="row">
+        <button id="supportGeneral" class="supportBtn">General Support</button>
+        <button id="supportScanner" class="danger">Scanner Tech Support</button>
+      </div>
+
       <div id="videoBox" class="videoBox">
         <div class="muted">Camera preview</div>
+
+        <!-- NEW: QR Alignment Frame -->
+        <div class="scanFrame">
+          <div id="scanFrameMark" class="scanFrameMark"></div>
+          <div id="scanFrameText" class="scanFrameText"></div>
+        </div>
       </div>
 
       <div id="toast" class="toast"></div>
@@ -44,13 +63,19 @@
   <div id="modal" class="modal hidden">
     <div class="modalCard">
       <h2>Manual Add</h2>
-      <div class="muted">Name optional. Student ID required (9 digits).</div>
-      <label>Name</label>
+
+      <!-- UPDATED TEXT ONLY -->
+      <div class="muted">First & Last Name required. Student ID required (9 digits). Grade required.</div>
+
+      <label>Name (First & Last)</label>
       <input id="mName" placeholder="DEVIN LIN">
+
       <label>Student ID</label>
       <input id="mId" inputmode="numeric" placeholder="236821666">
-      <label>Grade (optional)</label>
+
+      <label>Grade</label>
       <input id="mGrade" inputmode="numeric" placeholder="11">
+
       <div class="row">
         <button id="mSave">Save</button>
         <button id="mCancel" class="ghost">Cancel</button>
