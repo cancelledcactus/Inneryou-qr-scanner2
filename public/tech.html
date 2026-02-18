@@ -11,17 +11,44 @@
     <div class="card">
       <h1>Tech Dashboard</h1>
 
-      <div id="loginBox" class="loginBox">
-        <input id="idInput" inputmode="numeric" placeholder="Enter 9-digit ID">
-        <button id="loginBtn">Login</button>
-        <button id="scanLoginBtn" class="ghost">Scan ID</button>
-      </div>
-
-      <div id="main" class="hidden">
+      <div class="row between">
         <div class="row">
           <div class="pill" id="periodPill">Period: …</div>
+          <div class="pill" id="nyPill">NYC: …</div>
+        </div>
+        <div class="row">
           <button id="openScannerBtn">Open Scanner Mode</button>
           <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div id="notif" class="toast"></div>
+
+      <!-- Login -->
+      <div id="loginBox" class="loginBox">
+        <input id="idInput" inputmode="numeric" placeholder="9-digit ID">
+        <button id="loginBtn">Login</button>
+        <button id="scanLoginBtn" class="ghost">Scan Badge</button>
+      </div>
+
+      <!-- Main -->
+      <div id="main" class="hidden">
+        <div class="row between">
+          <h2 style="margin:12px 0 0 0;">Rooms</h2>
+          <div class="row">
+            <button id="supportOpenBtn" class="supportBtn">Support Queue</button>
+            <button id="supportResolvedBtn" class="ghost">Resolved</button>
+          </div>
+        </div>
+
+        <!-- Support panel -->
+        <div id="supportPanel" class="supportPanel hidden">
+          <div class="row between">
+            <div class="roomTitle" id="supportTitle">Support Requests</div>
+            <button id="supportCloseBtn" class="ghost">Close</button>
+          </div>
+          <div id="supportList" class="list"></div>
         </div>
 
         <div id="grid" class="grid"></div>
@@ -29,14 +56,14 @@
     </div>
   </div>
 
-  <!-- room detail modal -->
+  <!-- Room modal (kept, still works) -->
   <div id="roomModal" class="modal hidden">
     <div class="modalCard">
-      <h2 id="rmTitle">Room</h2>
-      <div id="rmBody" class="muted"></div>
-      <div class="row">
+      <div class="row between">
+        <h2 id="rmTitle">Room</h2>
         <button id="rmClose" class="ghost">Close</button>
       </div>
+      <div id="rmBody"></div>
     </div>
   </div>
 
