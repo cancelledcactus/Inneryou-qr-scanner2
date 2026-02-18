@@ -3,69 +3,93 @@
 <head>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Scanner</title>
+
   <link rel="stylesheet" href="/css/app.css">
   <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
 </head>
+
 <body>
+
+  <!-- Announcement Banner injected by JS -->
+  <!-- Health Monitor injected by JS -->
+
   <div class="wrap">
     <div class="card">
+
       <h1>Room Scanner</h1>
 
-      <!-- NEW: NYC Clock -->
+      <!-- NYC Clock -->
       <div class="muted" id="nyTime"></div>
 
+      <!-- Period -->
       <div class="muted" id="periodLabel">Period: …</div>
 
+      <!-- Room Lock -->
       <div class="row">
         <select id="roomSelect"></select>
         <button id="lockBtn">Lock</button>
       </div>
 
-      <!-- NEW: Locked message hint -->
+      <!-- Locked message hint -->
       <div id="lockedHint" class="muted small"></div>
 
+      <!-- Camera Controls -->
       <div class="row">
         <button id="startBtn">Start Camera</button>
         <button id="stopBtn" class="ghost">Stop</button>
         <button id="manualBtn" class="ghost">Manual Add</button>
       </div>
 
-      <!-- NEW: Support Buttons -->
+      <!-- Support Buttons -->
       <div class="row">
-        <button id="supportGeneral" class="supportBtn">General Support</button>
-        <button id="supportScanner" class="danger">Scanner Tech Support</button>
+        <button id="supportGeneral" class="supportBtn">
+          🛠 General Support
+        </button>
+        <button id="supportScanner" class="danger">
+          📷 Scanner Tech Support
+        </button>
       </div>
 
+      <!-- Camera Box -->
       <div id="videoBox" class="videoBox">
+
         <div class="muted">Camera preview</div>
 
-        <!-- NEW: QR Alignment Frame -->
+        <!-- QR Alignment Frame -->
         <div class="scanFrame">
           <div id="scanFrameMark" class="scanFrameMark"></div>
           <div id="scanFrameText" class="scanFrameText"></div>
         </div>
+
       </div>
 
+      <!-- Toast -->
       <div id="toast" class="toast"></div>
 
-      <div class="row">
+      <!-- Status Pills -->
+      <div class="row" id="pillRow">
         <div class="pill" id="queuePill">Queue: 0</div>
         <div class="pill" id="sentPill">Sent: 0</div>
         <div class="pill" id="errPill">Errors: 0</div>
       </div>
 
+      <!-- Health monitor row will be inserted here by JS -->
+
       <h3>This iPad (this period)</h3>
       <div id="localList" class="list"></div>
+
     </div>
   </div>
 
-  <!-- Manual modal -->
+  <!-- Manual Add Modal -->
   <div id="modal" class="modal hidden">
     <div class="modalCard">
+
       <h2>Manual Add</h2>
 
-      <!-- UPDATED TEXT ONLY -->
-      <div class="muted">First & Last Name required. Student ID required (9 digits). Grade required.</div>
+      <div class="muted">
+        First & Last Name required. Student ID required (9 digits). Grade required.
+      </div>
 
       <label>Name (First & Last)</label>
       <input id="mName" placeholder="DEVIN LIN">
@@ -80,9 +104,12 @@
         <button id="mSave">Save</button>
         <button id="mCancel" class="ghost">Cancel</button>
       </div>
+
     </div>
   </div>
 
+  <!-- Scanner Core -->
   <script type="module" src="/js/scannerCore.js"></script>
+
 </body>
 </html>
