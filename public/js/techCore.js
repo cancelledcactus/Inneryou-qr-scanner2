@@ -106,8 +106,15 @@ async function refreshLive() {
 }
 
 window.ctrl = async (id, action) => {
-  if (!confirm(`${action} room ${id}?`)) return;
-  await api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action }) });
+  let msg = "";
+  if (action === "disable") {
+    msg = prompt(`Disable scanning in ${id}?\n\nEnter an optional reason (e.g. 'See Tech', 'Fire Drill'):`);
+    if (msg === null) return; // User pressed Cancel
+  } else {
+    if (!confirm(`${action} room ${id}?`)) return;
+  }
+  
+  await api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action, message:msg }) });
   refreshLive();
 };
 
