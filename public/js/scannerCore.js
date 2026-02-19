@@ -64,7 +64,9 @@ async function sendDeviceStatus() {
 
   let battery_pct = null;
   let charging = 0;
-  if (navigator.getBattery) {
+  
+  // BRIDGE 1: Safe battery check for old iOS
+  if (typeof navigator.getBattery === "function") {
     try {
       const b = await navigator.getBattery();
       battery_pct = Math.round((b.level || 0) * 100);
@@ -83,7 +85,8 @@ async function sendDeviceStatus() {
   };
 
   try {
-    const res = await fetch("/api/device_status", {
+    // BRIDGE 2: Point to the new Unified Backend Endpoint
+    const res = await fetch("/api/live_sync", {
       method:"POST",
       headers:{ "Content-Type":"application/json" },
       body: JSON.stringify(payload)
@@ -535,7 +538,18 @@ async function flushQueue() {
       body: JSON.stringify({ room_id, items: batch }),
     });
 
+    // BRIDGE 3: Handle "Scanning Closed" gracefully so we don't trap the scanner in a loop
     if (!res?.ok) {
+      if (res?.error === "SCANNING_CLOSED") {
+        stopCamera();
+        showToast("Period Closed. Scanning stopped.", "err");
+        queue = []; // Clear queue
+        saveJson(QUEUE_KEY, queue);
+        updatePills();
+        flushing = false;
+        return;
+      }
+
       errCount++;
       showToast("Upload failed (will retry)", "warn");
       updatePills();
@@ -637,7 +651,7 @@ function ensureAnnouncementBanner() {
   document.body.appendChild(banner);
 
   // push page content down so banner doesn't cover title
-  document.body.style.paddingTop = "64px";
+  document.body.style.paddingTop = "80px"; // BRIDGE 4: Enhanced padding push
 
   return banner;
 }
@@ -645,7 +659,7 @@ function ensureAnnouncementBanner() {
 function setBannerVisible(visible) {
   const banner = ensureAnnouncementBanner();
   banner.style.display = visible ? "block" : "none";
-  document.body.style.paddingTop = visible ? "64px" : "0px";
+  document.body.style.paddingTop = visible ? "80px" : "0px";
 }
 
 function setBannerContent(message, level) {
@@ -738,8 +752,8 @@ function setPillText(id, txt) {
 async function updateBatteryPill() {
   ensureHealthRow();
 
-  // Battery API not supported on all iPads; handle gracefully
-  if (!navigator.getBattery) {
+  // BRIDGE 1: Safe check
+  if (typeof navigator.getBattery !== "function") {
     setPillText("batPill", "Battery: (n/a)");
     return;
   }
