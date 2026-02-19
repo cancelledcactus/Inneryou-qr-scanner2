@@ -2,8 +2,9 @@ import { json } from "./_middleware";
 import { getNYParts, getActivePeriod } from "./_time";
 
 export async function onRequestGet({ request, env }) {
-  const auth = request.headers.get("Authorization")||"";
-  // In prod, check auth here.
+  const { err } = await requireTechOrAdmin(request, env);
+  if (err) return json({ ok:false, error: err }, 401);
+
   const { hhmm, event_day } = getNYParts();
   
   const settings = await env.DB.prepare("SELECT key, value FROM settings").all();
@@ -11,7 +12,7 @@ export async function onRequestGet({ request, env }) {
   const { period_id } = await getActivePeriod(env.DB, hhmm, allowNoPeriod);
 
   const [rooms, summary, devices] = await Promise.all([
-    env.DB.prepare("SELECT room_id FROM rooms WHERE active=1 ORDER BY sort_order, room_id").all(),
+    env.DB.prepare("SELECT room_id, active FROM rooms WHERE active=1 ORDER BY sort_order, room_id").all(),
     env.DB.prepare(`SELECT * FROM room_period_summary WHERE event_day=? AND period_id=?`).bind(event_day, period_id).all(),
     env.DB.prepare(`SELECT * FROM room_device_status`).all()
   ]);
@@ -34,6 +35,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  // Scanners POST here, so no token required
   const body = await request.json().catch(()=>({}));
   const room_id = String(body.room_id||"").trim();
   if (!room_id) return json({ ok:false }, 400);
@@ -47,4 +49,28 @@ export async function onRequestPost({ request, env }) {
 
   const ctl = await env.DB.prepare("SELECT force_unlock, scanner_enabled FROM room_controls WHERE room_id=?").bind(room_id).first();
   return json({ ok:true, control: ctl || { force_unlock:0, scanner_enabled:1 } });
+}
+
+async function requireTechOrAdmin(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const user = await verifyToken(env, token);
+  if (!user) return { err:"Not logged in", user:null };
+  if (user.role !== "TECH" && user.role !== "ADMIN") return { err:"Forbidden", user:null };
+  return { err:null, user };
+}
+
+async function verifyToken(env, token) {
+  if (!token || !token.includes(".")) return null;
+  const [data, sig] = token.split(".");
+  const expected = await hmac(env.AUTH_SECRET, data);
+  if (sig !== expected) return null;
+  try { return JSON.parse(decodeURIComponent(escape(atob(data)))); } catch { return null; }
+}
+
+async function hmac(secret, data) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+  return btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=+$/g, "");
 }
