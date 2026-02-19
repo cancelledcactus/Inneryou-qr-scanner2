@@ -1,243 +1,221 @@
 <!doctype html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Dashboard</title>
   <link rel="stylesheet" href="/css/app.css">
-  <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Admin Dashboard</h1>
-
-      <!-- Login -->
-      <div id="loginBox" class="loginBox">
-        <input id="idInput" inputmode="numeric" placeholder="Enter 9-digit Admin ID">
-        <button id="loginBtn">Login</button>
-        <button id="scanLoginBtn" class="ghost">Scan ID</button>
+      
+      <div class="row between">
+        <h1>Admin Dashboard</h1>
       </div>
 
-      <!-- Main -->
-      <div id="main" class="hidden">
-        <div class="row">
-          <div class="pill" id="whoPill">—</div>
-          <button id="openScannerBtn">Open Scanner Mode</button>
-          <button id="logoutBtn" class="ghost">Logout</button>
+      <div id="loginView" class="row" style="margin-top:20px;">
+        <input id="idInput" inputmode="numeric" placeholder="Admin ID">
+        <button id="loginBtn">Login</button>
+      </div>
+
+      <div id="mainView" class="hidden">
+        
+        <div class="row" style="margin-top:12px;">
+          <div class="small muted" id="whoPill">Logged in: ...</div>
+          <button class="ghost small" id="openScannerBtn">Open Scanner Mode</button>
+          <button class="ghost small" id="logoutBtn">Logout</button>
         </div>
 
-        <!-- Tabs -->
         <div class="tabs">
           <button class="tabBtn active" data-tab="live">Live Rooms</button>
           <button class="tabBtn" data-tab="rooms">Rooms</button>
           <button class="tabBtn" data-tab="periods">Periods</button>
           <button class="tabBtn" data-tab="users">Users</button>
-          <button class="tabBtn" data-tab="settings">Settings</button>
           <button class="tabBtn" data-tab="export">Export</button>
-          <button class="tabBtn" data-tab="support">Support</button>
+          <div style="flex-grow:1"></div> <button class="tabBtn" data-tab="support">Support</button>
           <button class="tabBtn" data-tab="raffle">Raffle</button>
           <button class="tabBtn" data-tab="announce">Announcements</button>
-          <button class="tabBtn danger" data-tab="testing">Testing</button>
+          <button class="tabBtn danger-tab" data-tab="settings">Settings & Testing</button>
         </div>
 
-        <!-- Live -->
-        <section class="tabPane" id="tab-live">
+        <section id="tab-live" class="tabPane">
           <div class="row">
-            <div class="pill" id="periodPill">Period: …</div>
-            <div class="muted small" id="dayPill">—</div>
+            <div class="pill muted" id="periodPill">Period: ...</div>
+            <div class="pill muted" id="dayPill">Day: ...</div>
           </div>
-          <div id="grid" class="grid"></div>
+          <div id="liveGrid" class="grid"></div>
         </section>
 
-        <!-- Rooms -->
-        <section class="tabPane hidden" id="tab-rooms">
+        <section id="tab-rooms" class="tabPane hidden">
           <h2>Rooms</h2>
-          <div class="muted small">Rooms are flexible. No hardcoding.</div>
-
+          <div class="muted small" style="margin-bottom:10px;">Rooms are flexible. No hardcoding.</div>
           <div class="row">
             <input id="roomName" placeholder="Room 101">
             <button id="addRoomBtn">Add</button>
           </div>
-
           <h3>Quick Generate</h3>
           <div class="row">
             <input id="roomPrefix" placeholder="Prefix (e.g. Room )" value="Room ">
-            <input id="roomStart" inputmode="numeric" placeholder="Start (e.g. 101)" value="101">
-            <input id="roomEnd" inputmode="numeric" placeholder="End (e.g. 115)" value="115">
+            <input id="roomStart" placeholder="Start (101)" style="width:80px">
+            <input id="roomEnd" placeholder="End (115)" style="width:80px">
             <button id="genRoomsBtn">Generate</button>
           </div>
-
-          <div id="roomsList" class="list"></div>
+          <div id="roomsList" style="margin-top:20px;"></div>
         </section>
 
-        <!-- Periods -->
-        <section class="tabPane hidden" id="tab-periods">
+        <section id="tab-periods" class="tabPane hidden">
           <h2>Periods</h2>
-          <div class="muted small">Periods are used for duplicate rules and reporting.</div>
-
+          <div class="muted small" style="margin-bottom:12px;">Periods are used for duplicate rules. P1+P2 are linked automatically.</div>
           <div class="row">
             <input id="periodId" placeholder="P1">
-            <input id="periodName" placeholder="Period 1">
-            <input id="periodStart" placeholder="Start HH:MM (09:00)">
-            <input id="periodEnd" placeholder="End HH:MM (09:45)">
+            <input id="periodName" placeholder="Period 1" style="flex-grow:1">
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <input id="periodStart" placeholder="Start HH:MM (08:00)">
+            <input id="periodEnd" placeholder="End HH:MM (08:45)">
             <button id="addPeriodBtn">Add</button>
           </div>
-
-          <h3>Quick Generate 45-min Periods</h3>
+          <h3>Quick Generate</h3>
           <div class="row">
-            <input id="pPrefix" placeholder="ID prefix (P)" value="P">
-            <input id="pNamePrefix" placeholder="Name prefix (Period )" value="Period ">
-            <input id="pStartTime" placeholder="First start (09:00)" value="09:00">
-            <input id="pCount" inputmode="numeric" placeholder="Count (e.g. 6)" value="6">
+            <input id="pPrefix" placeholder="Prefix (P)" value="P">
+            <input id="pNamePrefix" placeholder="Name (Period )" value="Period " style="flex-grow:1">
           </div>
-          <div class="row">
-            <input id="pDuration" inputmode="numeric" placeholder="Duration minutes" value="45">
-            <input id="pGap" inputmode="numeric" placeholder="Gap minutes (0-10)" value="0">
+          <div class="row" style="margin-top:8px;">
+            <input id="pStartTime" placeholder="First start (08:00)" value="08:00">
+            <input id="pCount" placeholder="Count (6)" value="6" style="width:60px">
+            <input id="pDuration" placeholder="Dur (45)" value="45" style="width:60px">
+            <input id="pGap" placeholder="Gap (0)" value="0" style="width:60px">
             <button id="genPeriodsBtn">Generate</button>
           </div>
-
-          <div id="periodsList" class="list"></div>
+          <div id="periodsList" style="margin-top:20px;"></div>
         </section>
 
-        <!-- Users -->
-        <section class="tabPane hidden" id="tab-users">
+        <section id="tab-users" class="tabPane hidden">
           <h2>Users</h2>
-          <div class="muted small">Add Tech/Admin IDs here. They can login by typing or scanning.</div>
-
+          <div class="muted small" style="margin-bottom:12px;">Add Tech/Admin IDs here.</div>
           <div class="row">
             <input id="userId" inputmode="numeric" placeholder="9-digit ID">
             <select id="userRole">
               <option value="TECH">TECH</option>
               <option value="ADMIN">ADMIN</option>
             </select>
-            <input id="userName" placeholder="Name (optional)">
+            <input id="userName" placeholder="Name (optional)" style="flex-grow:1">
             <button id="addUserBtn">Add/Update</button>
           </div>
-
-          <div id="usersList" class="list"></div>
+          <div id="usersList" style="margin-top:20px;"></div>
         </section>
 
-        <!-- Settings -->
-        <section class="tabPane hidden" id="tab-settings">
-          <h2>Settings</h2>
-
+        <section id="tab-export" class="tabPane hidden">
+          <h2>Database Export</h2>
+          <div class="muted small" style="margin-bottom:15px;">Download raw data as CSV.</div>
           <div class="row">
-            <label class="muted small">Idle logout</label>
-            <select id="idleSelect">
-              <option value="0">Off</option>
-              <option value="120000">2 min</option>
-              <option value="300000" selected>5 min</option>
-              <option value="600000">10 min</option>
-              <option value="1800000">30 min</option>
-            </select>
+            <button onclick="downloadCsv('scans')">📥 Export Scans (All)</button>
+            <button onclick="downloadCsv('summary')">📥 Export Daily Summaries</button>
           </div>
-
-          <div class="row">
-            <label class="muted small">Testing allow NO_PERIOD</label>
-            <select id="noPeriodSelect">
-              <option value="true">True (testing)</option>
-              <option value="false">False (event mode)</option>
-            </select>
+          <div class="row" style="margin-top:10px;">
+            <button class="ghost" onclick="downloadCsv('users')">Export Users</button>
+            <button class="ghost" onclick="downloadCsv('rooms')">Export Rooms</button>
+            <button class="ghost" onclick="downloadCsv('periods')">Export Periods</button>
           </div>
-
-          <div class="row">
-            <label class="muted small">Batch size</label>
-            <input id="batchSize" inputmode="numeric" value="5">
-          </div>
-
-          <div class="row">
-            <label class="muted small">Flush interval ms</label>
-            <input id="flushMs" inputmode="numeric" value="12000">
-          </div>
-
-          <div class="row">
-            <button id="saveSettingsBtn">Save Settings</button>
-          </div>
-
-          <div class="muted small" id="settingsMsg"></div>
         </section>
 
-        <!-- Export -->
-        <section class="tabPane hidden" id="tab-export">
-          <h2>Export</h2>
-          <div class="muted small">Downloads CSV you can open in Google Sheets.</div>
+        <section id="tab-support" class="tabPane hidden">
+          <h2>Support Queue</h2>
           <div class="row">
-            <button id="exportAllBtn">Export All Scans CSV</button>
-            <button id="exportSummaryBtn" class="ghost">Export Summary CSV</button>
+            <button id="suppOpenBtn" class="active">Open</button>
+            <button id="suppResolvedBtn" class="ghost">Resolved</button>
           </div>
-          <div class="muted small" id="exportMsg"></div>
+          <div id="supportList" class="list" style="margin-top:20px;"></div>
         </section>
 
-        
-        <!-- Support -->
-        <section class="tabPane hidden" id="tab-support">
-          <h2>Support</h2>
-          <div class="row">
-            <button id="supportOpenBtn" class="supportBtn">Open</button>
-            <button id="supportResolvedBtn" class="ghost">Resolved</button>
-          </div>
-          <div id="supportList" class="list"></div>
-        </section>
-
-        <!-- Raffle -->
-        <section class="tabPane hidden" id="tab-raffle">
+        <section id="tab-raffle" class="tabPane hidden">
           <h2>Raffle</h2>
-          <div class="muted small">Eligible if student has scans in at least <b>N distinct periods</b> today (period grouping applies).</div>
+          <div class="muted small" style="margin-bottom:12px;">
+            Eligible if student has scans in at least <b>N distinct periods</b> (Linked periods count as 1).
+          </div>
           <div class="row">
             <label class="small muted">Min distinct periods</label>
-            <input id="raffleMinPeriods" inputmode="numeric" placeholder="4" style="max-width:120px">
-            <button id="raffleSaveCfg" class="ghost">Save</button>
+            <input id="rafMin" inputmode="numeric" placeholder="4" style="width:60px">
+            <button id="rafSaveBtn" class="ghost">Save</button>
           </div>
-          <div class="row">
-            <input id="raffleGrade" inputmode="numeric" placeholder="Grade (blank=all)" style="max-width:160px">
-            <input id="raffleCount" inputmode="numeric" placeholder="# Winners" value="1" style="max-width:140px">
-            <button id="raffleDrawBtn">Draw</button>
-            <button id="raffleListBtn" class="ghost">List Eligible</button>
+          <div class="row" style="margin-top:15px;">
+            <input id="rafGrade" inputmode="numeric" placeholder="Grade (blank=all)" style="width:140px">
+            <input id="rafCount" inputmode="numeric" placeholder="#" value="1" style="width:60px">
+            <button id="rafDrawBtn">Draw Winner</button>
+            <button id="rafListBtn" class="ghost">List Eligible</button>
           </div>
-          <div id="raffleOut" class="list"></div>
+          <div id="raffleResult" class="list" style="margin-top:20px;"></div>
         </section>
 
-        <!-- Announcements -->
-        <section class="tabPane hidden" id="tab-announce">
+        <section id="tab-announce" class="tabPane hidden">
           <h2>Announcements</h2>
-          <div class="muted small">Broadcast to scanners + dashboards.</div>
-          <label class="small muted">Level</label>
-          <select id="annLevel">
-            <option value="INFO">INFO</option>
-            <option value="URGENT">URGENT</option>
-          </select>
-          <label class="small muted">Message</label>
-          <input id="annMsg" placeholder="Type announcement message...">
+          <div class="muted small" style="margin-bottom:12px;">Broadcast alerts to Scanners and Tech Consoles.</div>
           <div class="row">
+            <select id="annLevel">
+              <option value="INFO">INFO (Blue)</option>
+              <option value="URGENT">URGENT (Red)</option>
+            </select>
+            <input id="annMsg" placeholder="Message..." style="flex-grow:1">
             <button id="annSendBtn">Send</button>
-            <button id="annClearBtn" class="ghost">Clear</button>
+            <button id="annClearBtn" class="danger">Clear</button>
           </div>
-          <div id="annStatus" class="muted small"></div>
+          <div id="annStatus" class="muted small" style="margin-top:10px;"></div>
         </section>
-<!-- Testing -->
-        <section class="tabPane hidden" id="tab-testing">
-          <h2>Testing Tools</h2>
-          <div class="muted small">Careful: Purge deletes all scans + summaries.</div>
+
+        <section id="tab-settings" class="tabPane hidden">
+          <h2>System Configuration</h2>
+          <div class="card" style="border:1px solid #30363d; margin-bottom:20px;">
+            <div class="row" style="margin-bottom:10px;">
+              <div style="width:150px;" class="muted small">Idle Logout</div>
+              <select id="setIdle">
+                <option value="120000">2 min</option>
+                <option value="300000">5 min</option>
+                <option value="1800000">30 min</option>
+              </select>
+            </div>
+            <div class="row" style="margin-bottom:10px;">
+              <div style="width:150px;" class="muted small">Testing Mode</div>
+              <select id="setTestMode">
+                <option value="true">True (Allow scanning anytime)</option>
+                <option value="false">False (Enforce periods)</option>
+              </select>
+            </div>
+            <div class="row" style="margin-bottom:10px;">
+              <div style="width:150px;" class="muted small">Batch Size</div>
+              <input id="setBatch" style="width:80px;" value="5">
+            </div>
+            <div class="row" style="margin-bottom:10px;">
+              <div style="width:150px;" class="muted small">Flush Interval (ms)</div>
+              <input id="setFlush" style="width:80px;" value="12000">
+            </div>
+            <button id="saveSettingsBtn">Save Configuration</button>
+            <span id="saveMsg" class="small text-ok" style="margin-left:10px; opacity:0; transition:opacity 0.5s;">Saved!</span>
+          </div>
+
+          <h2 class="text-warn">Simulation Tools</h2>
+          <div class="muted small" style="margin-bottom:10px;">Generate fake data to test the Live Grid.</div>
           <div class="row">
-            <button id="purgeBtn" class="danger">Purge Scans</button>
+            <button onclick="sim('scan')">Simulate 1 Scan</button>
+            <button onclick="sim('support')">Simulate Support</button>
+            <button onclick="sim('device')">Simulate Device Status</button>
           </div>
-          <div class="muted small" id="purgeMsg"></div>
+          <div id="simMsg" class="small muted" style="margin-top:8px; height:20px;"></div>
+
+          <h2 class="text-err" style="margin-top:30px;">Danger Zone</h2>
+          <div class="card" style="border:1px solid #8c2323; background: #2a0f0f;">
+            <div class="row between">
+              <div>
+                <div style="font-weight:bold; color:#ff7b72">Purge All Data</div>
+                <div class="small muted">Permanently deletes all history.</div>
+              </div>
+              <button class="danger" id="purgeBtn">PURGE DATA</button>
+            </div>
+          </div>
         </section>
+
       </div>
     </div>
   </div>
-
-  <!-- room detail modal -->
-  <div id="roomModal" class="modal hidden">
-    <div class="modalCard">
-      <h2 id="rmTitle">Room</h2>
-      <div id="rmBody" class="muted"></div>
-      <div class="row">
-        <button id="rmClose" class="ghost">Close</button>
-      </div>
-    </div>
-  </div>
-
   <script type="module" src="/js/adminCore.js"></script>
 </body>
 </html>
