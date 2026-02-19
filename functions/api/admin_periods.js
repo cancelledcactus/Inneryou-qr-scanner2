@@ -3,7 +3,20 @@ import { json } from "./_middleware";
 export async function onRequestGet({ request, env }) {
   const { err } = await requireAdmin(request, env);
   if (err) return json({ ok:false, error: err }, 401);
-  const rows = await env.DB.prepare("SELECT period_id, name, start_time, end_time, active, sort_order, group_id, scan_enabled FROM periods ORDER BY sort_order ASC, period_id ASC").all();
+
+  let rows;
+  try {
+    // Try fetching with the new columns (Linked Periods & Lunch)
+    rows = await env.DB.prepare(
+      "SELECT period_id, name, start_time, end_time, active, sort_order, group_id, scan_enabled FROM periods ORDER BY sort_order ASC, period_id ASC"
+    ).all();
+  } catch (e) {
+    // FALLBACK: If columns don't exist yet, fetch the old way so the UI doesn't break
+    rows = await env.DB.prepare(
+      "SELECT period_id, name, start_time, end_time, active, sort_order FROM periods ORDER BY sort_order ASC, period_id ASC"
+    ).all();
+  }
+
   return json({ ok:true, periods: rows.results || [] });
 }
 
@@ -13,6 +26,10 @@ export async function onRequestPost({ request, env }) {
 
   const body = await request.json().catch(()=>({}));
   const { action } = body;
+
+  // AUTO-MIGRATION: Safely try to add the new columns if they are missing before writing data
+  try { await env.DB.prepare("ALTER TABLE periods ADD COLUMN group_id TEXT").run(); } catch(e) {}
+  try { await env.DB.prepare("ALTER TABLE periods ADD COLUMN scan_enabled INTEGER DEFAULT 1").run(); } catch(e) {}
 
   if (action === "upsert") {
     const p = body.period || {};
@@ -31,9 +48,14 @@ export async function onRequestPost({ request, env }) {
   else if (action === "delete") {
     await env.DB.prepare("DELETE FROM periods WHERE period_id=?").bind(body.period_id).run();
   }
+  else if (action === "toggle") {
+    const act = body.active ? 1 : 0;
+    await env.DB.prepare("UPDATE periods SET active=? WHERE period_id=?").bind(act, body.period_id).run();
+  }
   return json({ ok:true });
 }
 
+// --- AUTH LOGIC ---
 async function requireAdmin(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
