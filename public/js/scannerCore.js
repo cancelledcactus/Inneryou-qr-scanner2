@@ -191,7 +191,7 @@ async function sendDeviceStatus() {
 
 function startDeviceStatus() {
   if (deviceStatusTimer) clearInterval(deviceStatusTimer);
-  deviceStatusTimer = setInterval(sendDeviceStatus, 15000);
+  deviceStatusTimer = setInterval(sendDeviceStatus, 3000);
   sendDeviceStatus();
 }
 
@@ -818,7 +818,7 @@ async function pollAnnouncement() {
 
 function startAnnouncementPolling() {
   if (announcementPollTimer) clearInterval(announcementPollTimer);
-  announcementPollTimer = setInterval(pollAnnouncement, 6000);
+  announcementPollTimer = setInterval(pollAnnouncement, 2000);
   pollAnnouncement();
 }
 
