@@ -15,13 +15,11 @@ const ui = {
   suppList: document.getElementById("supportList")
 };
 
-// --- AUTH ---
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const id = document.getElementById("idInput").value.trim();
   if (!/^\d{9}$/.test(id)) return alert("Invalid ID");
   const res = await api("/api/login", { method:"POST", body: JSON.stringify({ id }) });
   
-  // Allow both TECH and ADMIN to use this dashboard
   if (res?.ok && (res.role === "TECH" || res.role === "ADMIN")) {
     setToken(res.token, res.role, res.idleTimeoutMs);
     ui.whoPill.textContent = `Logged in: ${res.role} • ${res.name || ""}`;
@@ -38,7 +36,6 @@ function showMain() {
   startLiveLoop();
 }
 
-// --- TABS ---
 ui.tabs.forEach(btn => btn.addEventListener("click", () => {
   ui.tabs.forEach(b => b.classList.remove("active"));
   ui.panes.forEach(p => p.classList.add("hidden"));
@@ -49,7 +46,6 @@ ui.tabs.forEach(btn => btn.addEventListener("click", () => {
   if (tabId === "support") refreshSupport();
 }));
 
-// --- 1. LIVE SYNC ---
 function startLiveLoop() {
   if (timers.live) clearInterval(timers.live);
   refreshLive();
@@ -65,17 +61,21 @@ async function refreshLive() {
   ui.dayPill.textContent = `Day: ${res.event_day}`;
   
   ui.liveGrid.innerHTML = (res.rooms || []).map(r => {
-    const isOnline = r.online === 1;
+    const isOnline = r.online === true;
     const isEnabled = r.enabled !== 0;
     let statusText = "—";
     if (r.last_status === "ok") statusText = "✅ OK";
     else if (r.last_status === "dup") statusText = "⚠️ DUP";
     else if (r.last_status === "err") statusText = "❌ ERR";
 
+    // FIX: Dim offline rooms
+    const opacityStyle = isOnline ? "1" : "0.5";
+    const borderStyle = r.help ? 'border-color:#d29922;' : '';
+
     return `
-      <div class="roomBox" style="${r.help ? 'border-color:#d29922;' : ''}">
+      <div class="roomBox" style="${borderStyle} opacity: ${opacityStyle}; transition: opacity 0.3s;">
         <div class="row between">
-          <div class="roomTitle">${esc(r.room_id)}</div>
+          <div class="roomTitle">${esc(r.room_id)} ${!isOnline ? '<span class="text-err small" style="margin-left:8px;">(OFFLINE)</span>' : ''}</div>
           <div class="small ${isEnabled ? 'muted' : 'text-err'}">${isEnabled ? 'Enabled' : 'DISABLED'}</div>
         </div>
         <div class="small muted">Support: ${r.help ? `<span class="text-warn">REQUESTED (${esc(r.support_type)})</span>` : "No support"}</div>
@@ -89,7 +89,6 @@ async function refreshLive() {
         <div class="metaLine">Student: ${esc(r.last_student || "—")}</div>
         <div class="metaLine">Status: ${statusText}</div>
         <div class="metaLine">Last Scan: ${r.last_ts ? fmtTime(r.last_ts) : "—"}</div>
-        <div class="metaLine">Heartbeat: ${r.hb ? fmtTime(r.hb) : "—"}</div>
         
         <div class="deviceLine">
           Device: ${isOnline ? "Online ✅" : "Offline ❌"} • Bat: ${r.bat !== null ? r.bat + "%" : "n/a"} • Queue: ${r.queue || 0}
@@ -105,11 +104,12 @@ async function refreshLive() {
   }).join("");
 }
 
+// FIX: Added the prompt for Disable Message
 window.ctrl = async (id, action) => {
   let msg = "";
   if (action === "disable") {
     msg = prompt(`Disable scanning in ${id}?\n\nEnter an optional reason (e.g. 'See Tech', 'Fire Drill'):`);
-    if (msg === null) return; // User pressed Cancel
+    if (msg === null) return; // Cancelled
   } else {
     if (!confirm(`${action} room ${id}?`)) return;
   }
@@ -118,7 +118,6 @@ window.ctrl = async (id, action) => {
   refreshLive();
 };
 
-// --- 2. SUPPORT ---
 document.getElementById("suppOpenBtn").addEventListener("click", () => { supportMode="OPEN"; refreshSupport(); document.getElementById("suppOpenBtn").classList.add("active"); document.getElementById("suppResolvedBtn").classList.remove("active"); });
 document.getElementById("suppResolvedBtn").addEventListener("click", () => { supportMode="RESOLVED"; refreshSupport(); document.getElementById("suppResolvedBtn").classList.add("active"); document.getElementById("suppOpenBtn").classList.remove("active"); });
 
@@ -137,7 +136,6 @@ async function refreshSupport() {
 }
 window.resolveSupport = async (id) => { if(confirm("Resolve this ticket?")) await api("/api/support_resolve", { method:"POST", body:JSON.stringify({ req_id:id }) }); refreshSupport(); };
 
-// --- 3. ANNOUNCEMENTS ---
 document.getElementById("annSendBtn").addEventListener("click", async () => {
   await api("/api/admin_announcement", { method:"POST", body:JSON.stringify({ message:document.getElementById("annMsg").value, level:document.getElementById("annLevel").value, active:1 }) });
   document.getElementById("annStatus").textContent = "Sent!";
@@ -148,7 +146,6 @@ document.getElementById("annClearBtn").addEventListener("click", async () => {
   document.getElementById("annStatus").textContent = "Cleared.";
 });
 
-// --- Utils ---
 function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function fmtTime(s) { if(!s) return ""; return new Date(s.includes("T")?s:s.replace(" ","T")+"Z").toLocaleTimeString("en-US", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit"}); }
 
