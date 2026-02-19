@@ -17,7 +17,7 @@ export async function onRequestPost({ request, env }) {
   if (action === "forceUnlock") {
     await env.DB.prepare(`UPDATE room_controls SET force_unlock=1, updated_ts=datetime('now') WHERE room_id=?`).bind(room_id).run();
   } else if (action === "disable") {
-    const msg = body.message || ""; // <--- Captures the message from frontend
+    const msg = body.message || ""; // Get the typed message
     await env.DB.prepare(`UPDATE room_controls SET scanner_enabled=0, disable_message=? WHERE room_id=?`).bind(msg, room_id).run();
     await env.DB.prepare(`UPDATE room_device_status SET scanner_enabled=0 WHERE room_id=?`).bind(room_id).run();
   } else if (action === "enable") {
@@ -28,7 +28,6 @@ export async function onRequestPost({ request, env }) {
   return json({ ok:true });
 }
 
-// --- AUTH LOGIC ---
 async function requireTechOrAdmin(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
