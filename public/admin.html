@@ -29,6 +29,7 @@
           <button class="tabBtn" data-tab="rooms">Rooms</button>
           <button class="tabBtn" data-tab="periods">Periods</button>
           <button class="tabBtn" data-tab="users">Users</button>
+          <button class="tabBtn" data-tab="search" style="color:#58a6ff; border-color:rgba(88,166,255,0.4);">Search</button>
           <button class="tabBtn" data-tab="export">Export</button>
           <div style="flex-grow:1"></div>
           <button class="tabBtn" data-tab="support">Support</button>
@@ -37,12 +38,23 @@
           <button class="tabBtn danger-tab" data-tab="settings">Settings & Testing</button>
         </div>
 
+
         <section id="tab-live" class="tabPane">
           <div class="row">
             <div class="pill muted" id="periodPill">Period: ...</div>
             <div class="pill muted" id="dayPill">Day: ...</div>
           </div>
           <div id="liveGrid" class="grid"></div>
+        </section>
+
+        <section id="tab-search" class="tabPane hidden">
+          <h2>Student Search</h2>
+          <div class="muted small" style="margin-bottom:12px;">Search by Name or 9-Digit ID to see where a student went today.</div>
+          <div class="row">
+            <input id="searchInput" placeholder="Name or ID..." style="flex-grow:1">
+            <button id="searchBtn">Search</button>
+          </div>
+          <div id="searchResult" class="list" style="margin-top:20px;"></div>
         </section>
 
         <section id="tab-rooms" class="tabPane hidden">
