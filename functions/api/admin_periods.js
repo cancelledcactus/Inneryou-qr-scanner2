@@ -3,11 +3,7 @@ import { json } from "./_middleware";
 export async function onRequestGet({ request, env }) {
   const { err } = await requireAdmin(request, env);
   if (err) return json({ ok:false, error: err }, 401);
-
-  const rows = await env.DB.prepare(
-    "SELECT period_id, name, start_time, end_time, active, sort_order FROM periods ORDER BY sort_order ASC, period_id ASC"
-  ).all();
-
+  const rows = await env.DB.prepare("SELECT period_id, name, start_time, end_time, active, sort_order, group_id, scan_enabled FROM periods ORDER BY sort_order ASC, period_id ASC").all();
   return json({ ok:true, periods: rows.results || [] });
 }
 
@@ -15,69 +11,28 @@ export async function onRequestPost({ request, env }) {
   const { err } = await requireAdmin(request, env);
   if (err) return json({ ok:false, error: err }, 401);
 
-  const body = await request.json().catch(()=> ({}));
-  const action = String(body.action || "");
+  const body = await request.json().catch(()=>({}));
+  const { action } = body;
 
   if (action === "upsert") {
     const p = body.period || {};
-    const period_id = String(p.period_id || "").trim();
-    const name = String(p.name || "").trim();
-    const start_time = String(p.start_time || "").trim();
-    const end_time = String(p.end_time || "").trim();
-    const active = Number(p.active ?? 1) ? 1 : 0;
-    const sort_order = Number(p.sort_order ?? 0);
-
-    if (!period_id || !name || !isTime(start_time) || !isTime(end_time)) {
-      return json({ ok:false, error:"Bad period fields" }, 400);
-    }
-
-    await env.DB.prepare(
-      "INSERT OR REPLACE INTO periods(period_id,name,start_time,end_time,active,sort_order) VALUES (?,?,?,?,?,?)"
-    ).bind(period_id, name, start_time, end_time, active, sort_order).run();
-
-    return json({ ok:true });
-  }
-
-  if (action === "bulkUpsert") {
-    const periods = Array.isArray(body.periods) ? body.periods : [];
-    if (periods.length < 1) return json({ ok:false, error:"No periods" }, 400);
-
-    const stmts = periods.map(p => {
-      const period_id = String(p.period_id || "").trim();
-      const name = String(p.name || "").trim();
-      const start_time = String(p.start_time || "").trim();
-      const end_time = String(p.end_time || "").trim();
-      const active = Number(p.active ?? 1) ? 1 : 0;
-      const sort_order = Number(p.sort_order ?? 0);
-      if (!period_id || !name || !isTime(start_time) || !isTime(end_time)) throw new Error("Bad period row");
-      return env.DB.prepare(
-        "INSERT OR REPLACE INTO periods(period_id,name,start_time,end_time,active,sort_order) VALUES (?,?,?,?,?,?)"
-      ).bind(period_id, name, start_time, end_time, active, sort_order);
+    const gid = p.group_id || p.period_id; 
+    const scan = (p.scan_enabled === undefined) ? 1 : (p.scan_enabled ? 1 : 0);
+    await env.DB.prepare(`INSERT OR REPLACE INTO periods(period_id, name, start_time, end_time, active, sort_order, group_id, scan_enabled) VALUES (?,?,?,?,?,?,?,?)`).bind(p.period_id, p.name, p.start_time, p.end_time, p.active?1:0, p.sort_order||0, gid, scan).run();
+  } 
+  else if (action === "bulkUpsert") {
+    const stmts = (body.periods || []).map(p => {
+      const gid = p.group_id || p.period_id;
+      const scan = (p.scan_enabled === undefined) ? 1 : (p.scan_enabled ? 1 : 0);
+      return env.DB.prepare(`INSERT OR REPLACE INTO periods(period_id, name, start_time, end_time, active, sort_order, group_id, scan_enabled) VALUES (?,?,?,?,?,?,?,?)`).bind(p.period_id, p.name, p.start_time, p.end_time, p.active?1:0, p.sort_order||0, gid, scan);
     });
-
     await env.DB.batch(stmts);
-    return json({ ok:true, count: periods.length });
+  } 
+  else if (action === "delete") {
+    await env.DB.prepare("DELETE FROM periods WHERE period_id=?").bind(body.period_id).run();
   }
-
-  if (action === "toggle") {
-    const period_id = String(body.period_id || "").trim();
-    const active = Number(body.active ?? 1) ? 1 : 0;
-    if (!period_id) return json({ ok:false, error:"Missing period_id" }, 400);
-    await env.DB.prepare("UPDATE periods SET active=? WHERE period_id=?").bind(active, period_id).run();
-    return json({ ok:true });
-  }
-
-  if (action === "delete") {
-    const period_id = String(body.period_id || "").trim();
-    if (!period_id) return json({ ok:false, error:"Missing period_id" }, 400);
-    await env.DB.prepare("DELETE FROM periods WHERE period_id=?").bind(period_id).run();
-    return json({ ok:true });
-  }
-
-  return json({ ok:false, error:"Unknown action" }, 400);
+  return json({ ok:true });
 }
-
-function isTime(s) { return /^\d{2}:\d{2}$/.test(s); }
 
 async function requireAdmin(request, env) {
   const auth = request.headers.get("Authorization") || "";
@@ -95,6 +50,7 @@ async function verifyToken(env, token) {
   if (sig !== expected) return null;
   try { return JSON.parse(decodeURIComponent(escape(atob(data)))); } catch { return null; }
 }
+
 async function hmac(secret, data) {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
