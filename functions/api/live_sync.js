@@ -72,7 +72,6 @@ export async function onRequestPost({ request, env }) {
   return json({ ok:true, control: ctl || { force_unlock:0, scanner_enabled:1, disable_message:null } });
 }
 
-// --- AUTH LOGIC ---
 async function requireTechOrAdmin(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
