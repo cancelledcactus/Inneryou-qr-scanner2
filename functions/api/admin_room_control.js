@@ -8,21 +8,23 @@ export async function onRequestPost({ request, env }) {
   const { room_id, action } = body;
   if (!room_id) return json({ ok:false }, 400);
 
-  // Auto-create tables to prevent crashes
-  try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS room_controls (room_id TEXT PRIMARY KEY, force_unlock INTEGER DEFAULT 0, scanner_enabled INTEGER DEFAULT 1, updated_ts TEXT)`).run(); } catch(e){}
+  // Auto-create tables to prevent crashes and add message column
+  try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS room_controls (room_id TEXT PRIMARY KEY, force_unlock INTEGER DEFAULT 0, scanner_enabled INTEGER DEFAULT 1, updated_ts TEXT, disable_message TEXT)`).run(); } catch(e){}
+  try { await env.DB.prepare(`ALTER TABLE room_controls ADD COLUMN disable_message TEXT`).run(); } catch(e){}
   try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS room_device_status (room_id TEXT PRIMARY KEY, online INTEGER, battery_pct INTEGER, charging INTEGER, queue_len INTEGER, scanning INTEGER, scanner_enabled INTEGER DEFAULT 1, last_seen_ts TEXT, last_note TEXT)`).run(); } catch(e){}
 
-  // Ensure the room exists in the controls table
   await env.DB.prepare(`INSERT OR IGNORE INTO room_controls (room_id) VALUES (?)`).bind(room_id).run();
 
   // Process the button clicks
   if (action === "forceUnlock") {
     await env.DB.prepare(`UPDATE room_controls SET force_unlock=1, updated_ts=datetime('now') WHERE room_id=?`).bind(room_id).run();
   } else if (action === "disable") {
-    await env.DB.prepare(`UPDATE room_controls SET scanner_enabled=0 WHERE room_id=?`).bind(room_id).run();
+    const msg = body.message || ""; // Get the typed message
+    await env.DB.prepare(`UPDATE room_controls SET scanner_enabled=0, disable_message=? WHERE room_id=?`).bind(msg, room_id).run();
     await env.DB.prepare(`UPDATE room_device_status SET scanner_enabled=0 WHERE room_id=?`).bind(room_id).run();
   } else if (action === "enable") {
-    await env.DB.prepare(`UPDATE room_controls SET scanner_enabled=1, force_unlock=0 WHERE room_id=?`).bind(room_id).run();
+    // Clear message when enabling
+    await env.DB.prepare(`UPDATE room_controls SET scanner_enabled=1, force_unlock=0, disable_message=NULL WHERE room_id=?`).bind(room_id).run();
     await env.DB.prepare(`UPDATE room_device_status SET scanner_enabled=1 WHERE room_id=?`).bind(room_id).run();
   }
 
