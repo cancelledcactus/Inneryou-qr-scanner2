@@ -234,13 +234,18 @@ if (supportGeneralBtn) {
       return;
     }
 
+    // NEW: Ask for a description using native OS prompt
+    const note = prompt("Briefly describe the issue (Optional):");
+    if (note === null) return; // Stop if they clicked "Cancel"
+
     try {
       const res = await fetch("/api/support_request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room_id: lockedRoom,
-          support_type: "GENERAL"
+          support_type: "GENERAL",
+          note: note.trim() // Send the typed note to the backend
         })
       }).then(r => r.json());
 
@@ -264,13 +269,18 @@ if (supportScannerBtn) {
       return;
     }
 
+    // NEW: Ask for a description using native OS prompt
+    const note = prompt("Briefly describe the scanner issue (Optional):");
+    if (note === null) return; // Stop if they clicked "Cancel"
+
     try {
       const res = await fetch("/api/support_request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room_id: lockedRoom,
-          support_type: "SCANNER"
+          support_type: "SCANNER",
+          note: note.trim() // Send the typed note to the backend
         })
       }).then(r => r.json());
 
