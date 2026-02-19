@@ -41,3 +41,17 @@ button.danger{background:#7f1d1d}
 /* Tech/Admin support UI */
 .supportBadge{margin-top:6px;padding:6px 10px;border-radius:999px;display:inline-block;font-size:12px;background:#7f1d1d;border:1px solid rgba(255,255,255,.12)}
 .supportBadge.off{background:#0f1720;border:1px solid rgba(255,255,255,.06);color:#9aa7b2}
+/* Add to bottom of public/css/app.css */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+.roomBox { background: #0d1117; border: 1px solid rgba(255,255,255,.1); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.roomTitle { font-weight: 700; font-size: 16px; }
+.statRow { display: flex; gap: 15px; font-size: 18px; font-weight: 600; margin: 4px 0; }
+.metaLine { font-size: 13px; color: #9aa7b2; line-height: 1.4; }
+.deviceLine { font-size: 12px; color: #7d8590; margin-top: 4px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.1); }
+.ctrlRow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.fullBtn { grid-column: 1 / -1; }
+.text-ok { color: #238636; }
+.text-warn { color: #d29922; }
+.text-err { color: #da3633; }
+.danger-tab { color: #ff7b72; }
+.danger-tab.active { background: #3a1515; border-color: #ff7b72; }
