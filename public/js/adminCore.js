@@ -19,7 +19,6 @@ const ui = {
   rafResult: document.getElementById("raffleResult")
 };
 
-// --- AUTH ---
 document.getElementById("loginBtn").addEventListener("click", async () => {
   const id = document.getElementById("idInput").value.trim();
   if (!/^\d{9}$/.test(id)) return alert("Invalid ID");
@@ -40,7 +39,6 @@ function showMain() {
   startLiveLoop();
 }
 
-// --- TABS ---
 ui.tabs.forEach(btn => btn.addEventListener("click", () => {
   ui.tabs.forEach(b => b.classList.remove("active"));
   ui.panes.forEach(p => p.classList.add("hidden"));
@@ -55,7 +53,6 @@ ui.tabs.forEach(btn => btn.addEventListener("click", () => {
   if (tabId === "settings") loadSettings();
 }));
 
-// --- 1. LIVE SYNC ---
 function startLiveLoop() {
   if (timers.live) clearInterval(timers.live);
   refreshLive();
@@ -71,17 +68,21 @@ async function refreshLive() {
   ui.dayPill.textContent = `Day: ${res.event_day}`;
   
   ui.liveGrid.innerHTML = (res.rooms || []).map(r => {
-    const isOnline = r.online === 1;
+    const isOnline = r.online === true;
     const isEnabled = r.enabled !== 0;
     let statusText = "—";
     if (r.last_status === "ok") statusText = "✅ OK";
     else if (r.last_status === "dup") statusText = "⚠️ DUP";
     else if (r.last_status === "err") statusText = "❌ ERR";
 
+    // FIX: Dim the room if it goes offline
+    const opacityStyle = isOnline ? "1" : "0.5";
+    const borderStyle = r.help ? 'border-color:#d29922;' : '';
+
     return `
-      <div class="roomBox" style="${r.help ? 'border-color:#d29922;' : ''}">
+      <div class="roomBox" style="${borderStyle} opacity: ${opacityStyle}; transition: opacity 0.3s;">
         <div class="row between">
-          <div class="roomTitle">${esc(r.room_id)}</div>
+          <div class="roomTitle">${esc(r.room_id)} ${!isOnline ? '<span class="text-err small" style="margin-left:8px;">(OFFLINE)</span>' : ''}</div>
           <div class="small ${isEnabled ? 'muted' : 'text-err'}">${isEnabled ? 'Enabled' : 'DISABLED'}</div>
         </div>
         <div class="small muted">Support: ${r.help ? `<span class="text-warn">REQUESTED (${esc(r.support_type)})</span>` : "No support"}</div>
@@ -95,7 +96,6 @@ async function refreshLive() {
         <div class="metaLine">Student: ${esc(r.last_student || "—")}</div>
         <div class="metaLine">Status: ${statusText}</div>
         <div class="metaLine">Last Scan: ${r.last_ts ? fmtTime(r.last_ts) : "—"}</div>
-        <div class="metaLine">Heartbeat: ${r.hb ? fmtTime(r.hb) : "—"}</div>
         
         <div class="deviceLine">
           Device: ${isOnline ? "Online ✅" : "Offline ❌"} • Bat: ${r.bat !== null ? r.bat + "%" : "n/a"} • Queue: ${r.queue || 0}
@@ -111,11 +111,12 @@ async function refreshLive() {
   }).join("");
 }
 
+// FIX: Added the prompt for Disable Message
 window.ctrl = async (id, action) => {
   let msg = "";
   if (action === "disable") {
     msg = prompt(`Disable scanning in ${id}?\n\nEnter an optional reason (e.g. 'See Tech', 'Fire Drill'):`);
-    if (msg === null) return; // User pressed Cancel
+    if (msg === null) return; // Cancelled
   } else {
     if (!confirm(`${action} room ${id}?`)) return;
   }
@@ -124,7 +125,6 @@ window.ctrl = async (id, action) => {
   refreshLive();
 };
 
-// --- 2. ROOMS ---
 async function refreshRooms() {
   const res = await api("/api/admin_rooms");
   if (!res?.ok) return;
@@ -156,7 +156,6 @@ document.getElementById("genRoomsBtn").addEventListener("click", async () => {
 window.toggleRoom = async (id, act) => { await api("/api/admin_rooms", { method:"POST", body:JSON.stringify({ action:"upsert", room_id:id, active: act?0:1 }) }); refreshRooms(); };
 window.deleteRoom = async (id) => { if(confirm("Del?")) await api("/api/admin_rooms", { method:"POST", body:JSON.stringify({ action:"delete", room_id:id }) }); refreshRooms(); };
 
-// --- 3. PERIODS (Linked Logic) ---
 async function refreshPeriods() {
   const res = await api("/api/admin_periods");
   if (!res?.ok) return;
@@ -200,7 +199,6 @@ document.getElementById("genPeriodsBtn").addEventListener("click", async () => {
 });
 window.deletePeriod = async (id) => { if(confirm("Del?")) await api("/api/admin_periods", { method:"POST", body:JSON.stringify({ action:"delete", period_id:id }) }); refreshPeriods(); };
 
-// --- 4. USERS ---
 async function refreshUsers() {
   const res = await api("/api/admin_users");
   if (!res?.ok) return;
@@ -224,7 +222,6 @@ document.getElementById("addUserBtn").addEventListener("click", async () => {
 window.toggleUser = async (id, act) => { await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"toggle", id, active: act?0:1 }) }); refreshUsers(); };
 window.deleteUser = async (id) => { if(confirm("Del?")) await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"delete", id }) }); refreshUsers(); };
 
-// --- 5. EXPORT ---
 window.downloadCsv = (type) => {
   const a = document.createElement("a");
   a.href = `/api/admin_export_csv?type=${type}`;
@@ -232,7 +229,6 @@ window.downloadCsv = (type) => {
   a.click();
 };
 
-// --- 6. SUPPORT ---
 document.getElementById("suppOpenBtn").addEventListener("click", () => { supportMode="OPEN"; refreshSupport(); document.getElementById("suppOpenBtn").classList.add("active"); document.getElementById("suppResolvedBtn").classList.remove("active"); });
 document.getElementById("suppResolvedBtn").addEventListener("click", () => { supportMode="RESOLVED"; refreshSupport(); document.getElementById("suppResolvedBtn").classList.add("active"); document.getElementById("suppOpenBtn").classList.remove("active"); });
 
@@ -251,7 +247,6 @@ async function refreshSupport() {
 }
 window.resolveSupport = async (id) => { if(confirm("Resolve?")) await api("/api/support_resolve", { method:"POST", body:JSON.stringify({ req_id:id }) }); refreshSupport(); };
 
-// --- 7. RAFFLE ---
 document.getElementById("rafDrawBtn").addEventListener("click", async () => {
   const n = document.getElementById("rafCount").value;
   const grade = document.getElementById("rafGrade").value;
@@ -268,7 +263,6 @@ document.getElementById("rafSaveBtn").addEventListener("click", async () => {
   alert("Saved");
 });
 
-// --- 8. ANNOUNCEMENTS ---
 document.getElementById("annSendBtn").addEventListener("click", async () => {
   await api("/api/admin_announcement", { method:"POST", body:JSON.stringify({ message:document.getElementById("annMsg").value, level:document.getElementById("annLevel").value, active:1 }) });
   document.getElementById("annStatus").textContent = "Sent!";
@@ -279,7 +273,6 @@ document.getElementById("annClearBtn").addEventListener("click", async () => {
   document.getElementById("annStatus").textContent = "Cleared.";
 });
 
-// --- 9. SETTINGS & TESTING ---
 async function loadSettings() {
   const res = await api("/api/admin_settings");
   if (!res?.ok) return;
@@ -302,7 +295,6 @@ document.getElementById("purgeBtn").addEventListener("click", async () => {
   location.reload();
 });
 
-// --- Utils ---
 function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function fmtTime(s) { if(!s) return ""; return new Date(s.includes("T")?s:s.replace(" ","T")+"Z").toLocaleTimeString("en-US", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit"}); }
 function toMinutes(s) { const [h,m] = s.split(":").map(Number); return h*60+m; }
