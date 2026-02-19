@@ -720,7 +720,8 @@ function ensureAnnouncementBanner() {
   banner.style.top = "0";
   banner.style.left = "0";
   banner.style.right = "0";
-  banner.style.zIndex = "9999";
+  // FIX: Raised zIndex above Disable overlay (which is 10000)
+  banner.style.zIndex = "10005"; 
   banner.style.padding = "16px 14px";
   banner.style.fontSize = "22px";
   banner.style.fontWeight = "900";
