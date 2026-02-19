@@ -8,7 +8,6 @@
 <body>
   <div class="wrap">
     <div class="card">
-      
       <div class="row between">
         <h1>Admin Dashboard</h1>
       </div>
@@ -19,7 +18,6 @@
       </div>
 
       <div id="mainView" class="hidden">
-        
         <div class="row" style="margin-top:12px;">
           <div class="small muted" id="whoPill">Logged in: ...</div>
           <button class="ghost small" id="openScannerBtn">Open Scanner Mode</button>
@@ -32,7 +30,8 @@
           <button class="tabBtn" data-tab="periods">Periods</button>
           <button class="tabBtn" data-tab="users">Users</button>
           <button class="tabBtn" data-tab="export">Export</button>
-          <div style="flex-grow:1"></div> <button class="tabBtn" data-tab="support">Support</button>
+          <div style="flex-grow:1"></div>
+          <button class="tabBtn" data-tab="support">Support</button>
           <button class="tabBtn" data-tab="raffle">Raffle</button>
           <button class="tabBtn" data-tab="announce">Announcements</button>
           <button class="tabBtn danger-tab" data-tab="settings">Settings & Testing</button>
@@ -130,11 +129,9 @@
 
         <section id="tab-raffle" class="tabPane hidden">
           <h2>Raffle</h2>
-          <div class="muted small" style="margin-bottom:12px;">
-            Eligible if student has scans in at least <b>N distinct periods</b> (Linked periods count as 1).
-          </div>
+          <div class="muted small" style="margin-bottom:12px;">Eligible if student has scans in at least <b>N distinct periods</b>.</div>
           <div class="row">
-            <label class="small muted">Min distinct periods</label>
+            <label class="small muted">Min periods</label>
             <input id="rafMin" inputmode="numeric" placeholder="4" style="width:60px">
             <button id="rafSaveBtn" class="ghost">Save</button>
           </div>
@@ -149,7 +146,7 @@
 
         <section id="tab-announce" class="tabPane hidden">
           <h2>Announcements</h2>
-          <div class="muted small" style="margin-bottom:12px;">Broadcast alerts to Scanners and Tech Consoles.</div>
+          <div class="muted small" style="margin-bottom:12px;">Broadcast alerts to Scanners and Techs.</div>
           <div class="row">
             <select id="annLevel">
               <option value="INFO">INFO (Blue)</option>
