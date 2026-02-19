@@ -502,6 +502,9 @@ startBtn.addEventListener("click", async () => {
 stopBtn.addEventListener("click", () => stopCamera());
 
 async function startCamera() {
+  // FIX 1: Block the camera from ever starting if the Admin disabled it!
+  if (getDisableState().disabled) return;
+
   if (scanning) return;
   if (!window.ZXing?.BrowserMultiFormatReader) return showToast("ZXing not loaded", "err");
 
@@ -552,6 +555,16 @@ async function startCamera() {
 function stopCamera() {
   scanning = false;
   try { codeReader?.reset(); } catch {}
+  
+  // FIX 2: Aggressively kill the video stream to force the iPad hardware light to shut off
+  try {
+    const vid = document.getElementById("scannerVideo");
+    if (vid && vid.srcObject) {
+      vid.srcObject.getTracks().forEach(track => track.stop());
+      vid.srcObject = null;
+    }
+  } catch(e) {}
+
   showToast("Camera stopped", "info");
 }
 
