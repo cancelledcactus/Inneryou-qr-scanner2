@@ -17,6 +17,7 @@ const ui = {
   usersList: document.getElementById("usersList"),
   suppList: document.getElementById("supportList"),
   rafResult: document.getElementById("raffleResult")
+  searchResult: document.getElementById("searchResult")
 };
 
 document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -51,6 +52,7 @@ ui.tabs.forEach(btn => btn.addEventListener("click", () => {
   if (tabId === "users") refreshUsers();
   if (tabId === "support") refreshSupport();
   if (tabId === "settings") loadSettings();
+  if (tabId === "search") document.getElementById("searchInput").focus();
 }));
 
 function startLiveLoop() {
@@ -124,6 +126,47 @@ window.ctrl = async (id, action) => {
   await api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action, message:msg }) });
   refreshLive();
 };
+
+// --- STUDENT SEARCH ---
+document.getElementById("searchBtn").addEventListener("click", async () => {
+  const q = document.getElementById("searchInput").value.trim();
+  if (!q) return;
+  ui.searchResult.innerHTML = '<div class="muted small">Searching...</div>';
+  
+  const res = await api(`/api/admin_student_search?q=${encodeURIComponent(q)}`);
+  if (!res?.ok) return ui.searchResult.innerHTML = '<div class="text-err">Error searching.</div>';
+  if (!res.results || res.results.length === 0) return ui.searchResult.innerHTML = '<div class="muted small">No scans found today for that search.</div>';
+
+  ui.searchResult.innerHTML = res.results.map(s => {
+    const scans = s.scans || [];
+    
+    // Build the string of rooms, highlighting the very last one
+    const roomsHtml = scans.map((sc, i) => {
+      const isLast = i === scans.length - 1;
+      const roomStr = `${esc(sc.period_id)}: ${esc(sc.room_id)}`;
+      return isLast ? `<b class="text-ok" style="font-size:14px;">${roomStr} (Current)</b>` : roomStr;
+    }).join(" <span class='muted'>→</span> ");
+
+    return `
+      <div class="listItem" style="padding: 16px;">
+        <div class="row between" style="margin-bottom:8px;">
+          <div><b style="font-size:18px;">${esc(s.name)}</b> <span class="muted" style="margin-left:8px;">(${esc(s.student_id)})</span></div>
+          <div class="pill muted">Grade ${esc(s.grade)}</div>
+        </div>
+        <div style="line-height:1.5;">
+          <div class="small muted" style="margin-bottom:4px;">Today's Location Path:</div>
+          <div>${roomsHtml || "No locations recorded yet"}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+});
+
+// Pressing Enter in the search box searches automatically
+document.getElementById("searchInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") document.getElementById("searchBtn").click();
+});
+// ------------------------
 
 async function refreshRooms() {
   const res = await api("/api/admin_rooms");
