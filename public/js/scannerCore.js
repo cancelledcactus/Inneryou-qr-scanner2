@@ -30,6 +30,7 @@ const STORAGE_KEY = "scanner_room_lock_v1";
 const QUEUE_KEY = "scanner_queue_v1";
 const LOCAL_LIST_KEY = "scanner_local_list_v1";
 const PERIOD_KEY = "scanner_period_v1";
+const DISABLE_KEY = "scanner_disable_v1"; // <-- Added for reload persistence
 
 let lockedRoom = "";
 let isLocked = false;
@@ -56,6 +57,69 @@ function showToast(msg, type="info") {
   toast.style.opacity = "1";
   setTimeout(() => (toast.style.opacity = "0"), 1200);
 }
+
+// ==========================================
+// NEW: FULL SCREEN DISABLE OVERLAY UI
+// ==========================================
+function getDisableState() {
+  return loadJson(DISABLE_KEY, { disabled: false, msg: "" });
+}
+function setDisableState(disabled, msg) {
+  saveJson(DISABLE_KEY, { disabled, msg });
+}
+
+function updateDisableOverlay(enabled, message) {
+  let overlay = document.getElementById("disableOverlay");
+  
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "disableOverlay";
+    overlay.style.position = "fixed";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.width = "100%";
+    overlay.style.height = "100%";
+    overlay.style.zIndex = "10000";
+    overlay.style.display = "none";
+    overlay.style.flexDirection = "column";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.background = "rgba(0,0,0,0.95)";
+    overlay.style.backdropFilter = "blur(10px)";
+    overlay.style.padding = "20px";
+    overlay.style.textAlign = "center";
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", () => {
+       // Can only dismiss if it is currently ENABLED
+       const st = getDisableState();
+       if (!st.disabled) {
+         overlay.style.display = "none";
+       }
+    });
+  }
+
+  const esc = (s) => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+  if (!enabled) {
+    overlay.innerHTML = `
+      <div style="font-size: 90px; margin-bottom: 20px;">❌</div>
+      <h1 style="color: #ff7b72; margin-bottom: 10px; font-size:32px;">Scanner Disabled</h1>
+      <div style="font-size: 20px; color: #e6edf3; font-weight:bold;">${message ? esc(message) : "Disabled by Admin/Tech"}</div>
+    `;
+    overlay.style.display = "flex";
+    overlay.style.cursor = "default";
+  } else {
+    overlay.innerHTML = `
+      <div style="font-size: 90px; margin-bottom: 20px;">✅</div>
+      <h1 style="color: #238636; margin-bottom: 10px; font-size:32px;">Scanner Enabled</h1>
+      <div style="font-size: 18px; color: #9aa7b2;">Tap anywhere to continue</div>
+    `;
+    overlay.style.display = "flex";
+    overlay.style.cursor = "pointer";
+  }
+}
+// ==========================================
 
 let deviceStatusTimer = null;
 
@@ -96,10 +160,22 @@ async function sendDeviceStatus() {
     if (res?.ok && res.control) {
       const enabled = Number(res.control.scanner_enabled) !== 0;
       const forceUnlock = Number(res.control.force_unlock) === 1;
+      const msg = res.control.disable_message || ""; // <-- Added custom message
+      const currentState = getDisableState();
 
       if (!enabled) {
+        setDisableState(true, msg);
+        updateDisableOverlay(false, msg); // Show red X
         stopCamera();
-        showToast("Scanner disabled by admin", "warn");
+        startBtn.disabled = true;
+        startBtn.style.opacity = "0.5";
+      } else {
+        if (currentState.disabled) {
+          updateDisableOverlay(true, msg); // Show green check if it was previously disabled
+        }
+        setDisableState(false, "");
+        startBtn.disabled = false;
+        startBtn.style.opacity = "1";
       }
 
       if (forceUnlock) {
@@ -340,10 +416,12 @@ function hideFrameFeedback() {
 }
 
 function pauseCameraThenResume(ms) {
+  const wasScanning = scanning; // <-- FIX: Check if camera was ON
   stopCamera();
   setTimeout(async () => {
     hideFrameFeedback();
-    if (isLocked) await startCamera();
+    // <-- FIX: Only turn back on if it was actually running before!
+    if (isLocked && wasScanning) await startCamera();
   }, ms);
 }
 
@@ -371,7 +449,7 @@ lockBtn.addEventListener("click", async () => {
   applyLockUi();
   showToast(`Locked: ${roomSelect.value}`, "ok");
   startHeartbeat();
-  startDeviceStatus(); // FIX: Now it turns on the status pings when you lock!
+  startDeviceStatus(); // Added to ensure ping starts on lock
 });
 
 /* ------------------ MANUAL ENTRY ------------------ */
@@ -858,6 +936,15 @@ function startAutoRefresh() {
   renderLocalList();
   updatePills();
   setPeriodLabel(loadJson(PERIOD_KEY, "…"));
+
+  // Check Local Storage if it was disabled before page reload
+  const ds = getDisableState();
+  if (ds.disabled) {
+    updateDisableOverlay(false, ds.msg);
+    startBtn.disabled = true;
+    startBtn.style.opacity = "0.5";
+  }
+
   startFlushTimer();
   startNYClock();
   startAnnouncementPolling();
@@ -866,6 +953,6 @@ function startAutoRefresh() {
 
   if (isLocked && lockedRoom) {
     startHeartbeat();
-    startDeviceStatus(); // FIX: Also runs automatically if the page reloads while locked!
+    startDeviceStatus(); // Start polling for commands!
   }
 })();
