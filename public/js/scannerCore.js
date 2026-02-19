@@ -292,6 +292,15 @@ function applyLockUi() {
 
 function setPeriodLabel(p) {
   const val = p || "…";
+  const oldVal = loadJson(PERIOD_KEY, "…");
+
+  // NEW: If the period just changed, instantly clear the "This iPad" list!
+  if (oldVal !== "…" && oldVal !== val) {
+    localPeriodList = [];
+    saveJson(LOCAL_LIST_KEY, localPeriodList);
+    renderLocalList();
+  }
+
   periodLabel.textContent = `Period: ${val}`;
   saveJson(PERIOD_KEY, val);
 }
