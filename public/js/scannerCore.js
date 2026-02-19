@@ -371,6 +371,7 @@ lockBtn.addEventListener("click", async () => {
   applyLockUi();
   showToast(`Locked: ${roomSelect.value}`, "ok");
   startHeartbeat();
+  startDeviceStatus(); // FIX: Now it turns on the status pings when you lock!
 });
 
 /* ------------------ MANUAL ENTRY ------------------ */
@@ -863,5 +864,8 @@ function startAutoRefresh() {
   startHealthMonitor();
   startAutoRefresh();
 
-  if (isLocked && lockedRoom) startHeartbeat();
+  if (isLocked && lockedRoom) {
+    startHeartbeat();
+    startDeviceStatus(); // FIX: Also runs automatically if the page reloads while locked!
+  }
 })();
