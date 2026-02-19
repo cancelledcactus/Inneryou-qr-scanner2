@@ -230,18 +230,64 @@ window.deletePeriod = async (id) => { if(confirm("Del?")) await api("/api/admin_
 // ============================================================
 async function refreshUsers() {
   const res = await api("/api/admin_users");
+  if (!res?.ok) return; // Safety check added
+
   ui.usersList.innerHTML = (res.users || []).map(u => `
     <div class="listItem">
-      <div><b>${esc(u.id)}</b> (${u.role}) ${esc(u.name||"")}</div>
-      <button class="danger" onclick="deleteUser('${u.id}')">Delete</button>
+      <div>
+        <div style="font-weight:700">${esc(u.id)} — ${esc(u.role)} ${u.name ? "• " + esc(u.name) : ""}</div>
+        <div class="small muted" style="margin-top:4px;">${u.active ? "active" : "inactive"}</div>
+      </div>
+      <div class="row">
+        <button class="ghost" onclick="toggleUser('${u.id}', ${u.active})">
+          ${u.active ? "Disable" : "Enable"}
+        </button>
+        <button class="danger" onclick="deleteUser('${u.id}')">Delete</button>
+      </div>
     </div>
-  `).join("");
+  `).join("") || '<div class="muted small">No users found.</div>';
 }
+
+// Add User
 document.getElementById("addUserBtn").addEventListener("click", async () => {
-  await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"upsert", user:{ id:document.getElementById("userId").value, role:document.getElementById("userRole").value, name:document.getElementById("userName").value, active:1 } }) });
+  const id = document.getElementById("userId").value.trim();
+  const role = document.getElementById("userRole").value;
+  const name = document.getElementById("userName").value.trim();
+  
+  if (!/^\d{9}$/.test(id)) return alert("9-digit ID required");
+
+  await api("/api/admin_users", { 
+    method: "POST", 
+    body: JSON.stringify({ 
+      action: "upsert", 
+      user: { id, role, name, active: 1 } 
+    }) 
+  });
+  
+  document.getElementById("userId").value = "";
+  document.getElementById("userName").value = "";
   refreshUsers();
 });
-window.deleteUser = async (id) => { if(confirm("Del?")) await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"delete", id }) }); refreshUsers(); };
+
+// Toggle Active Status
+window.toggleUser = async (id, currentActive) => {
+  await api("/api/admin_users", { 
+    method: "POST", 
+    body: JSON.stringify({ action: "toggle", id, active: currentActive ? 0 : 1 }) 
+  });
+  refreshUsers();
+};
+
+// Delete User
+window.deleteUser = async (id) => { 
+  if(confirm(`Delete user ${id}?`)) {
+    await api("/api/admin_users", { 
+      method: "POST", 
+      body: JSON.stringify({ action: "delete", id }) 
+    });
+    refreshUsers(); 
+  }
+};
 
 // ============================================================
 // 5. EXPORT
