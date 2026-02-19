@@ -18,17 +18,28 @@ export async function onRequestGet({ request, env }) {
 
   const sumMap = new Map((summary.results||[]).map(s=>[s.room_id, s]));
   const devMap = new Map((devices.results||[]).map(d=>[d.room_id, d]));
+  
+  const nowMs = Date.now();
 
   const out = (rooms.results||[]).map(r => {
     const s = sumMap.get(r.room_id) || {};
     const d = devMap.get(r.room_id) || {};
+    
+    // FIX: Calculate if the device is actually offline (no ping in 45 seconds)
+    const lastSeenMs = d.last_seen_ts ? new Date(d.last_seen_ts + "Z").getTime() : 0;
+    const isActuallyOnline = (d.online === 1) && ((nowMs - lastSeenMs) < 45000);
+
     return {
       room_id: r.room_id,
       ok: s.ok_count||0, dup: s.dup_count||0, err: s.err_count||0,
       last_ts: s.last_ts, last_student: s.last_student_id, last_status: s.last_status,
       help: s.help_flag, support_type: s.support_type,
-      hb: s.last_heartbeat, bat: d.battery_pct, online: d.online, scanning: d.scanning, 
-      enabled: d.scanner_enabled, queue: d.queue_len 
+      hb: s.last_heartbeat, 
+      bat: isActuallyOnline ? d.battery_pct : null, 
+      online: isActuallyOnline, 
+      scanning: d.scanning, 
+      enabled: d.scanner_enabled, 
+      queue: isActuallyOnline ? d.queue_len : 0 
     };
   });
   return json({ ok:true, period_id, event_day, is_testing: allowNoPeriod, rooms: out });
@@ -39,7 +50,6 @@ export async function onRequestPost({ request, env }) {
   const room_id = String(body.room_id||"").trim();
   if (!room_id) return json({ ok:false }, 400);
 
-  // Auto-create tables for safety
   try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS room_controls (room_id TEXT PRIMARY KEY, force_unlock INTEGER DEFAULT 0, scanner_enabled INTEGER DEFAULT 1, updated_ts TEXT, disable_message TEXT)`).run(); } catch(e){}
   try { await env.DB.prepare(`ALTER TABLE room_controls ADD COLUMN disable_message TEXT`).run(); } catch(e){}
   try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS room_device_status (room_id TEXT PRIMARY KEY, online INTEGER, battery_pct INTEGER, charging INTEGER, queue_len INTEGER, scanning INTEGER, scanner_enabled INTEGER DEFAULT 1, last_seen_ts TEXT, last_note TEXT)`).run(); } catch(e){}
@@ -53,7 +63,6 @@ export async function onRequestPost({ request, env }) {
 
   await env.DB.prepare(`INSERT OR IGNORE INTO room_controls (room_id) VALUES (?)`).bind(room_id).run();
   
-  // FETCH the disable message to return to scanner
   const ctl = await env.DB.prepare("SELECT force_unlock, scanner_enabled, disable_message FROM room_controls WHERE room_id=?").bind(room_id).first();
 
   if (ctl && ctl.force_unlock === 1) {
