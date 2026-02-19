@@ -16,7 +16,7 @@ const ui = {
   periodsList: document.getElementById("periodsList"),
   usersList: document.getElementById("usersList"),
   suppList: document.getElementById("supportList"),
-  rafResult: document.getElementById("raffleResult")
+  rafResult: document.getElementById("raffleResult"),
   searchResult: document.getElementById("searchResult")
 };
 
