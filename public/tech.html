@@ -1,73 +1,72 @@
 <!doctype html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tech</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tech Dashboard</title>
   <link rel="stylesheet" href="/css/app.css">
-  <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Tech Dashboard</h1>
-<div id="main" class="hidden">
+      
       <div class="row between">
-        <div class="row">
-          <div class="pill" id="periodPill">Period: …</div>
-          <div class="pill" id="nyPill">NYC: …</div>
-        </div>
-        <div class="row">
-          <button id="openScannerBtn">Open Scanner Mode</button>
-          <button id="logoutBtn" class="ghost">Logout</button>
-        </div>
+        <h1>Tech Dashboard</h1>
       </div>
-</div>
 
-      <!-- Notifications -->
-      <div id="notif" class="toast"></div>
-
-      <!-- Login -->
-      <div id="loginBox" class="loginBox">
-        <input id="idInput" inputmode="numeric" placeholder="9-digit ID">
+      <div id="loginView" class="row" style="margin-top:20px;">
+        <input id="idInput" inputmode="numeric" placeholder="Tech ID">
         <button id="loginBtn">Login</button>
-        <button id="scanLoginBtn" class="ghost">Scan Badge</button>
       </div>
 
-      <!-- Main -->
-      <div id="main" class="hidden">
-        <div class="row between">
-          <h2 style="margin:12px 0 0 0;">Rooms</h2>
+      <div id="mainView" class="hidden">
+        
+        <div class="row" style="margin-top:12px;">
+          <div class="small muted" id="whoPill">Logged in: ...</div>
+          <button class="ghost small" id="openScannerBtn">Open Scanner Mode</button>
+          <button class="ghost small" id="logoutBtn">Logout</button>
+        </div>
+
+        <div class="tabs">
+          <button class="tabBtn active" data-tab="live">Live Rooms</button>
+          <button class="tabBtn" data-tab="support">Support Queue</button>
+          <button class="tabBtn" data-tab="announce">Announcements</button>
+        </div>
+
+        <section id="tab-live" class="tabPane">
           <div class="row">
-            <button id="supportOpenBtn" class="supportBtn">Support Queue</button>
-            <button id="supportResolvedBtn" class="ghost">Resolved</button>
+            <div class="pill muted" id="periodPill">Period: ...</div>
+            <div class="pill muted" id="dayPill">Day: ...</div>
           </div>
-        </div>
+          <div id="liveGrid" class="grid"></div>
+        </section>
 
-        <!-- Support panel -->
-        <div id="supportPanel" class="supportPanel hidden">
-          <div class="row between">
-            <div class="roomTitle" id="supportTitle">Support Requests</div>
-            <button id="supportCloseBtn" class="ghost">Close</button>
+        <section id="tab-support" class="tabPane hidden">
+          <h2>Support Queue</h2>
+          <div class="row">
+            <button id="suppOpenBtn" class="active">Open</button>
+            <button id="suppResolvedBtn" class="ghost">Resolved</button>
           </div>
-          <div id="supportList" class="list"></div>
-        </div>
+          <div id="supportList" class="list" style="margin-top:20px;"></div>
+        </section>
 
-        <div id="grid" class="grid"></div>
+        <section id="tab-announce" class="tabPane hidden">
+          <h2>Announcements</h2>
+          <div class="muted small" style="margin-bottom:12px;">Broadcast alerts to Scanners and other Techs.</div>
+          <div class="row">
+            <select id="annLevel">
+              <option value="INFO">INFO (Blue)</option>
+              <option value="URGENT">URGENT (Red)</option>
+            </select>
+            <input id="annMsg" placeholder="Message..." style="flex-grow:1">
+            <button id="annSendBtn">Send</button>
+            <button id="annClearBtn" class="danger">Clear</button>
+          </div>
+          <div id="annStatus" class="muted small" style="margin-top:10px;"></div>
+        </section>
+
       </div>
     </div>
   </div>
-
-  <!-- Room modal (kept, still works) -->
-  <div id="roomModal" class="modal hidden">
-    <div class="modalCard">
-      <div class="row between">
-        <h2 id="rmTitle">Room</h2>
-        <button id="rmClose" class="ghost">Close</button>
-      </div>
-      <div id="rmBody"></div>
-    </div>
-  </div>
-
   <script type="module" src="/js/techCore.js"></script>
 </body>
 </html>
