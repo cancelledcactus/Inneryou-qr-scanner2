@@ -159,18 +159,18 @@ button.danger:hover { background: rgba(239, 68, 68, 0.2); border-color: var(--er
 /* Video / Scanner View */
 /* Video / Scanner View */
 .videoBox { 
-  margin: 16px auto; /* Centers the box */
-  max-width: 300px;  /* Limits how wide it gets on iPads/Desktops */
-  max-height: 20vh;  /* Prevents it from taking up more than half the screen height */
-  border-radius: 16px; 
+  margin: 16px auto;   /* Centers the box */
+  width: 100%;         
+  max-width: 280px;    /* Much smaller! QR-box size */
+  aspect-ratio: 1 / 1; /* Makes it a perfect square */
+  border-radius: 20px; /* Slightly rounder edges for a modern look */
   overflow: hidden; 
-  aspect-ratio: 1/2; /* Fits iPad camera naturally */
   background: #000; 
   display: flex; 
   align-items: center; 
   justify-content: center; 
   position: relative; 
-  border: 1px solid var(--border-focus); 
+  border: 2px solid var(--primary); /* Highlights the scanner box */
   box-shadow: inset 0 0 40px rgba(0,0,0,0.8), 0 8px 32px rgba(0,0,0,0.4); 
 }
 .scanFrame { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); animation: fadeIn 0.2s ease; z-index: 10; }
