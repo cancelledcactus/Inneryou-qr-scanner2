@@ -508,8 +508,8 @@ async function startCamera() {
   if (scanning) return;
   if (!window.ZXing?.BrowserMultiFormatReader) return showToast("ZXing not loaded", "err");
 
-  videoBox.innerHTML = `
-    <video id="scannerVideo" autoplay playsinline muted style="width:100%;height:100%"></video>
+videoBox.innerHTML = `
+    <video id="scannerVideo" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
   `;
 
   try {
