@@ -265,11 +265,27 @@ document.getElementById("addUserBtn").addEventListener("click", async () => {
 window.toggleUser = async (id, act) => { await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"toggle", id, active: act?0:1 }) }); refreshUsers(); };
 window.deleteUser = async (id) => { if(confirm("Del?")) await api("/api/admin_users", { method:"POST", body:JSON.stringify({ action:"delete", id }) }); refreshUsers(); };
 
-window.downloadCsv = (type) => {
+window.downloadCsv = async (type) => {
+  // Grab the token from session storage
+  const token = sessionStorage.getItem("auth_token_v1"); 
+  
+  // Manually fetch the file with the Authorization header
+  const res = await fetch(`/api/admin_export_csv?type=${type}`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+  
+  if (!res.ok) return alert("Export failed. You may need to log in again.");
+
+  // Convert the response to a file blob and trigger the download
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = `/api/admin_export_csv?type=${type}`;
+  a.href = url;
   a.download = `export_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 document.getElementById("suppOpenBtn").addEventListener("click", () => { supportMode="OPEN"; refreshSupport(); document.getElementById("suppOpenBtn").classList.add("active"); document.getElementById("suppResolvedBtn").classList.remove("active"); });
