@@ -361,25 +361,54 @@ function fmtTime(s) { if(!s) return ""; return new Date(s.includes("T")?s:s.repl
 function toMinutes(s) { const [h,m] = s.split(":").map(Number); return h*60+m; }
 function fromMinutes(m) { const hh=Math.floor(m/60)%24, mm=m%60; return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; }
 
-document.getElementById("enableAllBtn")?.addEventListener("click", async () => {
+document.getElementById("enableAllBtn")?.addEventListener("click", async (e) => {
   if (!confirm("Enable scanning in ALL rooms?")) return;
   
-  // Send the enable command to all rooms in parallel
-  await Promise.all(currentRooms.map(id => 
-    api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action:"enable" }) })
-  ));
+  // 1. Show loading state
+  const btn = e.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "⏳ Enabling...";
+  btn.disabled = true;
+  
+  // 2. Loop sequentially to prevent Cloudflare D1 Database Locking
+  for (const id of currentRooms) {
+    await api("/api/admin_room_control", { 
+      method: "POST", 
+      body: JSON.stringify({ room_id: id, action: "enable" }) 
+    });
+  }
+  
+  // 3. Restore button and refresh the grid
+  btn.innerHTML = originalText;
+  btn.disabled = false;
   refreshLive();
 });
 
-document.getElementById("disableAllBtn")?.addEventListener("click", async () => {
+document.getElementById("disableAllBtn")?.addEventListener("click", async (e) => {
   const msg = prompt("Disable scanning in ALL rooms?\nEnter an optional reason (e.g. 'Fire Drill'):");
   if (msg === null) return; // Cancelled
   
-  // Send the disable command and message to all rooms in parallel
-  await Promise.all(currentRooms.map(id => 
-    api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action:"disable", message:msg }) })
-  ));
+  // 1. Show loading state
+  const btn = e.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "⏳ Disabling...";
+  btn.disabled = true;
+  
+  // 2. Loop sequentially to prevent Cloudflare D1 Database Locking
+  for (const id of currentRooms) {
+    await api("/api/admin_room_control", { 
+      method: "POST", 
+      body: JSON.stringify({ room_id: id, action: "disable", message: msg }) 
+    });
+  }
+  
+  // 3. Restore button and refresh the grid
+  btn.innerHTML = originalText;
+  btn.disabled = false;
   refreshLive();
 });
 
 startIdleWatcher(() => location.reload());
+  refreshLive();
+});
+
