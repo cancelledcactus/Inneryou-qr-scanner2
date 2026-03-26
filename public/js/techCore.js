@@ -1,6 +1,7 @@
 import { api, setToken, clearToken, startIdleWatcher } from "./auth.js";
 
 let timers = { live: null };
+
 let supportMode = "OPEN";
 
 const ui = {
@@ -145,6 +146,54 @@ document.getElementById("annClearBtn").addEventListener("click", async () => {
   await api("/api/admin_announcement", { method:"DELETE" });
   document.getElementById("annStatus").textContent = "Cleared.";
 });
+document.getElementById("enableAllBtn")?.addEventListener("click", async (e) => {
+  if (!confirm("Enable scanning in ALL rooms?")) return;
+  
+  // 1. Show loading state
+  const btn = e.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "⏳ Enabling...";
+  btn.disabled = true;
+  
+  // 2. Loop sequentially to prevent Cloudflare D1 Database Locking
+  for (const id of currentRooms) {
+    await api("/api/admin_room_control", { 
+      method: "POST", 
+      body: JSON.stringify({ room_id: id, action: "enable" }) 
+    });
+  }
+  
+  // 3. Restore button and refresh the grid
+  btn.innerHTML = originalText;
+  btn.disabled = false;
+  refreshLive();
+});
+
+document.getElementById("disableAllBtn")?.addEventListener("click", async (e) => {
+  const msg = prompt("Disable scanning in ALL rooms?\nEnter an optional reason (e.g. 'Fire Drill'):");
+  if (msg === null) return; // Cancelled
+  
+  // 1. Show loading state
+  const btn = e.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = "⏳ Disabling...";
+  btn.disabled = true;
+  
+  // 2. Loop sequentially to prevent Cloudflare D1 Database Locking
+  for (const id of currentRooms) {
+    await api("/api/admin_room_control", { 
+      method: "POST", 
+      body: JSON.stringify({ room_id: id, action: "disable", message: msg }) 
+    });
+  }
+  
+  // 3. Restore button and refresh the grid
+  btn.innerHTML = originalText;
+  btn.disabled = false;
+  refreshLive();
+});
+
+startIdleWatcher(() => location.reload());
 
 function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function fmtTime(s) { if(!s) return ""; return new Date(s.includes("T")?s:s.replace(" ","T")+"Z").toLocaleTimeString("en-US", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit"}); }
