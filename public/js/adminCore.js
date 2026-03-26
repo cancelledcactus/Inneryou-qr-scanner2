@@ -1,6 +1,7 @@
 import { api, setToken, clearToken, startIdleWatcher } from "./auth.js";
 
 let timers = { live: null };
+let currentRooms = [];
 let supportMode = "OPEN";
 
 const ui = {
@@ -68,6 +69,7 @@ async function refreshLive() {
   const testTag = res.is_testing ? ` <span class="text-warn" style="font-weight:800">(TESTING_MODE)</span>` : "";
   ui.periodPill.innerHTML = `Period: ${res.period_id} ${testTag}`;
   ui.dayPill.textContent = `Day: ${res.event_day}`;
+  currentRooms = (res.rooms || []).map(r => r.room_id);
   
   ui.liveGrid.innerHTML = (res.rooms || []).map(r => {
     const isOnline = r.online === true;
@@ -358,5 +360,26 @@ function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"
 function fmtTime(s) { if(!s) return ""; return new Date(s.includes("T")?s:s.replace(" ","T")+"Z").toLocaleTimeString("en-US", {timeZone:"America/New_York", hour:"2-digit", minute:"2-digit"}); }
 function toMinutes(s) { const [h,m] = s.split(":").map(Number); return h*60+m; }
 function fromMinutes(m) { const hh=Math.floor(m/60)%24, mm=m%60; return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`; }
+
+document.getElementById("enableAllBtn")?.addEventListener("click", async () => {
+  if (!confirm("Enable scanning in ALL rooms?")) return;
+  
+  // Send the enable command to all rooms in parallel
+  await Promise.all(currentRooms.map(id => 
+    api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action:"enable" }) })
+  ));
+  refreshLive();
+});
+
+document.getElementById("disableAllBtn")?.addEventListener("click", async () => {
+  const msg = prompt("Disable scanning in ALL rooms?\nEnter an optional reason (e.g. 'Fire Drill'):");
+  if (msg === null) return; // Cancelled
+  
+  // Send the disable command and message to all rooms in parallel
+  await Promise.all(currentRooms.map(id => 
+    api("/api/admin_room_control", { method:"POST", body:JSON.stringify({ room_id:id, action:"disable", message:msg }) })
+  ));
+  refreshLive();
+});
 
 startIdleWatcher(() => location.reload());
