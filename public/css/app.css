@@ -157,8 +157,11 @@ button.danger:hover { background: rgba(239, 68, 68, 0.2); border-color: var(--er
 .text-err { color: var(--err); }
 
 /* Video / Scanner View */
+/* Video / Scanner View */
 .videoBox { 
-  margin-top: 16px; 
+  margin: 16px auto; /* Centers the box */
+  max-width: 500px;  /* Limits how wide it gets on iPads/Desktops */
+  max-height: 50vh;  /* Prevents it from taking up more than half the screen height */
   border-radius: 16px; 
   overflow: hidden; 
   aspect-ratio: 4/3; /* Fits iPad camera naturally */
