@@ -1,7 +1,7 @@
 import { api, setToken, clearToken, startIdleWatcher } from "./auth.js";
 
 let timers = { live: null };
-
+let currentRooms = [];
 let supportMode = "OPEN";
 
 const ui = {
