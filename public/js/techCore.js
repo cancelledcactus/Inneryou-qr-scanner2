@@ -60,6 +60,8 @@ async function refreshLive() {
   const testTag = res.is_testing ? ` <span class="text-warn" style="font-weight:800">(TESTING)</span>` : "";
   ui.periodPill.innerHTML = `Period: ${res.period_id} ${testTag}`;
   ui.dayPill.textContent = `Day: ${res.event_day}`;
+
+  currentRooms = (res.rooms || []).map(r => r.room_id);
   
   ui.liveGrid.innerHTML = (res.rooms || []).map(r => {
     const isOnline = r.online === true;
